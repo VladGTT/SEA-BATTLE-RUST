@@ -1,7 +1,7 @@
 use fltk::{
     enums::{ Color, Event, Font},
     prelude::{WidgetExt, *},
-    *, app::Sender, table::Table,
+    *, app::Sender, table::Table, frame::Frame,
 };
 use once_cell::sync::Lazy;
 use std::sync::{Mutex,MutexGuard};
@@ -192,20 +192,27 @@ impl PlayField {
 
 }
 
-
-struct PrepWindow{
-    group: group::Group,
-
-    table: table::Table,
-
-    label_4deck: frame::Frame,
-    label_3deck: frame::Frame,
-    label_2deck: frame::Frame,
-    label_1deck: frame::Frame,
+trait Visible{
+    fn hide(&mut self);
+    fn show(&mut self);
 }
 
-impl PrepWindow{
-    pub fn new(sender:Sender<CustomEvents>)->Self{
+trait PrepareWindow{
+    fn new_prep_window(sender:Sender<CustomEvents>)->Self;
+    fn reset(&mut self);
+    fn place_ship(&mut self);
+}
+
+trait MatchWindow{
+    fn new_match_window(sender:Sender<CustomEvents>)->Self;
+}
+
+struct MyWindow{
+    group: group::Group,
+}
+
+impl PrepareWindow for MyWindow{
+    fn new_prep_window(sender:Sender<CustomEvents>)->Self{
         let mut group=group::Group::new(0,0,800,600,None);
     
     
@@ -261,6 +268,7 @@ impl PrepWindow{
         label_1deck.set_label_font(Font::Helvetica);
         label_1deck.set_label_size(16);
     
+
         let mut table = table::Table::default().with_size(427, 427);
 
         table.set_rows(10);
@@ -303,49 +311,54 @@ impl PrepWindow{
 
         group.end();
 
-        PrepWindow { 
-                group: group,
-                table: table,
-                label_4deck:label_4deck,
-                label_3deck:label_3deck,
-                label_2deck:label_2deck,
-                label_1deck:label_1deck 
-            }
+        MyWindow {group: group}
 
     }
 
 
-    pub fn reset(&mut self){
+    fn reset(&mut self){
         let mut field = PLAYER_FIELD.lock().unwrap();
 
         field.reset();
 
         let (n_1decks ,n_2decks,n_3decks,n_4decks)=field.get_ship_numb();
 
-        self.label_1deck.set_label(&format!("Ships with {} decks remained: {}",1,MAX_1DECK-n_1decks));
-        self.label_1deck.set_label_color(Color::Black);
 
-        self.label_2deck.set_label(&format!("Ships with {} decks remained: {}",2,MAX_2DECK-n_2decks));
-        self.label_2deck.set_label_color(Color::Black);
+        let mut label_4deck = self.group.child(1).unwrap();
+        let mut label_3deck = self.group.child(2).unwrap();
+        let mut label_2deck = self.group.child(3).unwrap();
+        let mut label_1deck = self.group.child(4).unwrap();
 
-        self.label_3deck.set_label(&format!("Ships with {} decks remained: {}",3,MAX_3DECK-n_3decks));
-        self.label_3deck.set_label_color(Color::Black);
 
-        self.label_4deck.set_label(&format!("Ships with {} decks remained: {}",4,MAX_4DECK-n_4decks));
-        self.label_4deck.set_label_color(Color::Black);
+
+
+
+        label_1deck.set_label(&format!("Ships with {} decks remained: {}",1,MAX_1DECK-n_1decks));
+        label_1deck.set_label_color(Color::Black);
+
+        label_2deck.set_label(&format!("Ships with {} decks remained: {}",2,MAX_2DECK-n_2decks));
+        label_2deck.set_label_color(Color::Black);
+
+        label_3deck.set_label(&format!("Ships with {} decks remained: {}",3,MAX_3DECK-n_3decks));
+        label_3deck.set_label_color(Color::Black);
+
+        label_4deck.set_label(&format!("Ships with {} decks remained: {}",4,MAX_4DECK-n_4decks));
+        label_4deck.set_label_color(Color::Black);
+        
         self.group.redraw();
     }
 
-    pub fn place_ship(&mut self){
-        let (rt, cl, rb, cr) = self.table.get_selection();
+    fn place_ship(&mut self){
 
-        let mut field = &mut PLAYER_FIELD.lock().unwrap();
-       
-        let _ = PlayField::place_ship(&mut field,(rt, cl, rb, cr));
         
-        let (n_1decks ,n_2decks,n_3decks,n_4decks)=field.get_ship_numb();
+        let table = Table::from_dyn_widget(&self.group.child(0).unwrap()).unwrap();
 
+        let mut label_4deck = Frame::from_dyn_widget(&self.group.child(1).unwrap()).unwrap();
+        let mut label_3deck = Frame::from_dyn_widget(&self.group.child(2).unwrap()).unwrap();
+        let mut label_2deck = Frame::from_dyn_widget(&self.group.child(3).unwrap()).unwrap();
+        let mut label_1deck = Frame::from_dyn_widget(&self.group.child(4).unwrap()).unwrap();
 
+        
         let update_labels=|label: &mut frame::Frame,remaining_ships: i32,deck_number:i32|{
             label.set_label(&format!("Ships with {} decks remained: {}",deck_number,remaining_ships));
             if remaining_ships == 0 {
@@ -353,21 +366,28 @@ impl PrepWindow{
             }
         };
 
-        update_labels(&mut self.label_4deck,MAX_4DECK-n_4decks,4);
-        update_labels(&mut self.label_3deck,MAX_3DECK-n_3decks,3);
-        update_labels(&mut self.label_2deck,MAX_2DECK-n_2decks,2);
-        update_labels(&mut self.label_1deck,MAX_1DECK-n_1decks,1);
+
+
+        let (rt, cl, rb, cr) = table.get_selection();
+
+
+        let mut field = &mut PLAYER_FIELD.lock().unwrap();
+       
+        let _ = PlayField::place_ship(&mut field,(rt, cl, rb, cr));
+        
+        let (n_1decks ,n_2decks,n_3decks,n_4decks)=field.get_ship_numb();
+
+        
+
+
+        update_labels(&mut label_4deck ,MAX_4DECK-n_4decks,4);
+        update_labels(&mut label_3deck,MAX_3DECK-n_3decks,3);
+        update_labels(&mut label_2deck,MAX_2DECK-n_2decks,2);
+        update_labels(&mut label_1deck,MAX_1DECK-n_1decks,1);
 
         self.group.redraw();
     }
 
-    
-    pub fn hide(&mut self){
-        self.group.hide();
-    }
-    pub fn show(&mut self){
-        self.group.show();
-    }
 }
 
 
@@ -399,12 +419,9 @@ fn draw_data(x: i32, y: i32, w: i32, h: i32, selected: bool, value: u8) {
     draw::pop_clip();
 }
 
-struct MatchWindow{
-    group: group::Group
-}
 
-impl MatchWindow {
-    fn new(sender:Sender<CustomEvents>) -> Self {
+impl MatchWindow for MyWindow {
+    fn new_match_window(sender:Sender<CustomEvents>) -> Self {
         let mut group=group::Group::new(0,0,800,600,None);
 
         let mut player_table = table::Table::default().with_size(427, 427);
@@ -469,12 +486,16 @@ impl MatchWindow {
 
         group.add(&player_table);
         group.add(&opponent_table);
-        MatchWindow { group: group }
+        MyWindow { group: group }
     }
-    pub fn hide(&mut self){
+    
+}
+
+impl Visible for MyWindow{
+fn hide(&mut self){
         self.group.hide();
     }
-    pub fn show(&mut self){
+    fn show(&mut self){
         self.group.show();
     }
 }
@@ -489,19 +510,22 @@ const COLOR:Color=Color::DarkRed;
 
 static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
-static MATCH: Lazy<Mutex<Match>> = Lazy::new(|| Mutex::new(Match::default()));
 
-struct Match{
-    is_started:bool,
-    move_numb:Option<i32>,
-    last_strike_coords:Option<(u8,u8)>
-}
 
-impl Match{
-    fn default()->Self{
-        Match { is_started: false, move_numb: None, last_strike_coords: None }
-    }
-}
+
+// static MATCH: Lazy<Mutex<Match>> = Lazy::new(|| Mutex::new(Match::default()));
+
+// struct Match{
+//     is_started:bool,
+//     move_numb:Option<i32>,
+//     last_strike_coords:Option<(u8,u8)>
+// }
+
+// impl Match{
+//     fn default()->Self{
+//         Match { is_started: false, move_numb: None, last_strike_coords: None }
+//     }
+// }
 
 
 struct Connection{
@@ -618,9 +642,9 @@ fn main() {
     let mut wind = window::Window::default().with_size(800, 600);
     wind.set_label("SEA BATTLE");
 
-    let mut prep_window = PrepWindow::new(s);
+    let mut prep_window = MyWindow::new_prep_window(s);
 
-    let mut match_window = MatchWindow::new(s);
+    let mut match_window = MyWindow::new_match_window(s);
     match_window.hide();
 
     wind.make_resizable(true);
