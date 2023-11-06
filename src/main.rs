@@ -474,8 +474,19 @@ const COLOR:Color=Color::DarkRed;
 
 static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
+static MATCH: Lazy<Mutex<Match>> = Lazy::new(|| Mutex::new(Match::default()));
 
+struct Match{
+    is_started:bool,
+    move_numb:Option<i32>,
+    last_strike_coords:Option<(u8,u8)>
+}
 
+impl Match{
+    fn default()->Self{
+        Match { is_started: false, move_numb: None, last_strike_coords: None }
+    }
+}
 
 
 struct Connection{
@@ -587,10 +598,6 @@ fn main() {
     } else {
         s.send(CustomEvents::ConnectAsClient);        
     }
-    
-
-   
-
 
     
     let mut wind = window::Window::default().with_size(800, 600);
