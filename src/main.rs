@@ -200,7 +200,7 @@ trait Visible{
 trait PrepareWindow{
     fn new_prep_window(sender:Sender<CustomEvents>)->Self;
     fn reset(&mut self);
-    fn place_ship(&mut self);
+    fn place_ship(&mut self,func: &dyn Fn((i32,i32,i32,i32))->(i32,i32,i32,i32));
 }
 
 trait MatchWindow{
@@ -315,40 +315,29 @@ impl PrepareWindow for MyWindow{
 
     }
 
-
     fn reset(&mut self){
-        let mut field = PLAYER_FIELD.lock().unwrap();
-
-        field.reset();
-
-        let (n_1decks ,n_2decks,n_3decks,n_4decks)=field.get_ship_numb();
-
 
         let mut label_4deck = self.group.child(1).unwrap();
         let mut label_3deck = self.group.child(2).unwrap();
         let mut label_2deck = self.group.child(3).unwrap();
         let mut label_1deck = self.group.child(4).unwrap();
 
-
-
-
-
-        label_1deck.set_label(&format!("Ships with {} decks remained: {}",1,MAX_1DECK-n_1decks));
+        label_1deck.set_label(&format!("Ships with {} decks remained: {}",1,MAX_1DECK));
         label_1deck.set_label_color(Color::Black);
 
-        label_2deck.set_label(&format!("Ships with {} decks remained: {}",2,MAX_2DECK-n_2decks));
+        label_2deck.set_label(&format!("Ships with {} decks remained: {}",2,MAX_2DECK));
         label_2deck.set_label_color(Color::Black);
 
-        label_3deck.set_label(&format!("Ships with {} decks remained: {}",3,MAX_3DECK-n_3decks));
+        label_3deck.set_label(&format!("Ships with {} decks remained: {}",3,MAX_3DECK));
         label_3deck.set_label_color(Color::Black);
 
-        label_4deck.set_label(&format!("Ships with {} decks remained: {}",4,MAX_4DECK-n_4decks));
+        label_4deck.set_label(&format!("Ships with {} decks remained: {}",4,MAX_4DECK));
         label_4deck.set_label_color(Color::Black);
         
         self.group.redraw();
     }
 
-    fn place_ship(&mut self){
+    fn place_ship(&mut self, func: &dyn Fn((i32,i32,i32,i32))->(i32,i32,i32,i32)){
 
         
         let table = Table::from_dyn_widget(&self.group.child(0).unwrap()).unwrap();
@@ -365,21 +354,9 @@ impl PrepareWindow for MyWindow{
                 label.set_label_color(COLOR);
             }
         };
-
-
-
-        let (rt, cl, rb, cr) = table.get_selection();
-
-
-        let mut field = &mut PLAYER_FIELD.lock().unwrap();
-       
-        let _ = PlayField::place_ship(&mut field,(rt, cl, rb, cr));
         
-        let (n_1decks ,n_2decks,n_3decks,n_4decks)=field.get_ship_numb();
-
-        
-
-
+        let (n_1decks ,n_2decks,n_3decks,n_4decks)=func(table.get_selection());
+      
         update_labels(&mut label_4deck ,MAX_4DECK-n_4decks,4);
         update_labels(&mut label_3deck,MAX_3DECK-n_3decks,3);
         update_labels(&mut label_2deck,MAX_2DECK-n_2decks,2);
@@ -492,7 +469,7 @@ impl MatchWindow for MyWindow {
 }
 
 impl Visible for MyWindow{
-fn hide(&mut self){
+    fn hide(&mut self){
         self.group.hide();
     }
     fn show(&mut self){
@@ -661,11 +638,19 @@ fn main() {
     while app.wait() {
         if let Some(msg) = r.recv() {
             match msg {
-                CustomEvents::ShipPlaced => prep_window.place_ship(),
-                CustomEvents::ResetField=>prep_window.reset(),
+                CustomEvents::ShipPlaced =>{
+                    prep_window.place_ship(&|(rt, cl, rb, cr)|->(i32,i32,i32,i32){                        
+                        let mut field = &mut PLAYER_FIELD.lock().unwrap();
+                        let _ = PlayField::place_ship(&mut field,(rt, cl, rb, cr));
+                        return field.get_ship_numb();
+                    });
+                },
+                CustomEvents::ResetField=>{
+                    let mut player_field=PLAYER_FIELD.lock().unwrap();
+                    player_field.reset();   
+                    prep_window.reset();
+                },
                 CustomEvents::Ready=>{
-
-                
                     println!("Ready");
                     prep_window.hide();
                     match_window.show();
