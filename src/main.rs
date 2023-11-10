@@ -15,8 +15,8 @@ const MAX_3DECK: i32 = 2;
 const MAX_2DECK: i32 = 3;
 const MAX_1DECK: i32 = 4;
 
-const SOCKET_INPUT: &str = "localhost:8888"; 
-const SOCKET_OUTPUT: &str = "localhost:8889"; 
+const SOCKET: &str = "localhost:8888"; 
+// const SOCKET_OUTPUT: &str = "localhost:8889"; 
 
 #[derive(Clone,Copy)]
 enum CustomEvents{
@@ -32,8 +32,8 @@ enum CustomEvents{
 static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 
-static INPUT: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
-static OUTPUT: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
+static CONNECTION: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
+// static OUTPUT: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
 
 static CURRENT_MATCH: Lazy<Mutex<Match>> = Lazy::new(|| Mutex::new(Match::default()));
 
@@ -90,33 +90,38 @@ fn main() {
 
 
 
-    let handle_strike = |buf: &[u8;3]|{
+    let handle_strike = |buf: &[u8;3]|->bool{
         match buf {
             [_,255,255] => {
                 println!("Hit");
+                return true;
             },
             [_,254,254] => {
                 println!("Miss");
+                return true;
             },
             [253,253,253] => {
                 let mut current_match = CURRENT_MATCH.lock().unwrap();
                 current_match.opponent_ready=true;
                 println!("Opponent is ready");
+                return true;
+
             },
             _=>{
                 println!("Message delivered successfully");
                 let mut player_field=PLAYER_FIELD.lock().unwrap();
-                let mut output = OUTPUT.lock().unwrap();
+                let mut connection = CONNECTION.lock().unwrap();
                 // let mut current_match = CURRENT_MATCH.lock().unwrap();
                 
                 match player_field.strike((buf[1],buf[2])){
                     Ok(confirm)=>{
-                        output.write(&[1,255,255]);
+                        connection.write(&[1,255,255]);
                     },
                     Err(_)=>{
-                        output.write(&[2,254,254]);
+                        connection.write(&[2,254,254]);
                     }
                 }
+                return true;
                 
             }
         }
@@ -167,8 +172,9 @@ fn main() {
 
                     current_match.player_ready=true;
                     
-                    let mut output=OUTPUT.lock().unwrap();
+                    let mut output=CONNECTION.lock().unwrap();
                     output.write(&[253,253,253]);
+
 
                     prep_window.hide();
                     match_window.show();
@@ -186,46 +192,34 @@ fn main() {
                     if !(current_match.player_ready && current_match.opponent_ready) {continue;}
 
 
-                    let mut output=OUTPUT.lock().unwrap();
+                    let mut connection=CONNECTION.lock().unwrap();
 
 
-                    output.write(&[30,current_match.last_coords.0,current_match.last_coords.1]);
+                    connection.write(&[30,current_match.last_coords.0,current_match.last_coords.1]);
+
+                    connection.listen(handle_strike);
                 },
                 CustomEvents::ConnectAsServer=>{
                     
                     std::thread::spawn(move ||{
-                        let mut input = INPUT.lock().unwrap();
-                        match input.connect_as_server(SOCKET_INPUT){
-                            Ok(_)=>println!("Input connected"),
-                            Err(_)=>println!("Input connection error")
+                        let mut input = CONNECTION.lock().unwrap();
+                        match input.connect_as_server(SOCKET){
+                            Ok(_)=>println!("Connected"),
+                            Err(_)=>println!("Connection error")
                         }
 
                         input.listen(handle_strike);
-                    });
-                    std::thread::spawn(move ||{
-                        let mut output = OUTPUT.lock().unwrap();
-                        match output.connect_as_server(SOCKET_OUTPUT){
-                            Ok(_)=>println!("Output connected"),
-                            Err(_)=>println!("Output connection error")
-                        }
                     });
                 },
                 CustomEvents::ConnectAsClient=>{
                     std::thread::spawn(move ||{
-                        let mut input = INPUT.lock().unwrap();
-                        match input.connect_as_client(SOCKET_OUTPUT){
-                            Ok(_)=>println!("Input connected"),
-                            Err(_)=>println!("Input connection error")
+                        let mut input = CONNECTION.lock().unwrap();
+                        match input.connect_as_client(SOCKET){
+                            Ok(_)=>println!("Connected"),
+                            Err(_)=>println!("Connection error")
                         }
 
                         input.listen(handle_strike);
-                    });
-                    std::thread::spawn(move ||{
-                        let mut output = OUTPUT.lock().unwrap();
-                        match output.connect_as_client(SOCKET_INPUT){
-                            Ok(_)=>println!("Output connected"),
-                            Err(_)=>println!("Output connection error")
-                        }
                     });
                 },
             }

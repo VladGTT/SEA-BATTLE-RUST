@@ -31,17 +31,6 @@ impl Connection{
             Err(_) => Err(())
         }    
     }
-    // pub fn read(&mut self,buf: &mut [u8])->Result<(),()>{
-    //     match self.stream{
-    //         Some(ref mut str)=>{
-    //             match str.read(buf){
-    //                 Ok(_)=>Ok(()),
-    //                 Err(_)=>Err(())
-    //             }
-    //         },
-    //         None=>Err(())
-    //     }
-    // }
     pub fn write(&mut self,data: &[u8])->Result<(),()>{
         match self.stream{
             Some(ref mut str)=>{
@@ -54,7 +43,7 @@ impl Connection{
         }
     }
 
-    pub fn listen(&mut self, func: fn(&[u8;3])){
+    pub fn listen(&mut self, func: fn(&[u8;3])->bool){
         match self.stream {
             Some(ref mut stream)=>{
                 let mut buf = [0 as u8;3];
@@ -63,7 +52,7 @@ impl Connection{
                     match stream.read(&mut buf){
                         Ok(_)=>{
                             if buf == [0,0,0]{continue;}
-                            func(&buf);
+                            if func(&buf) {return;}
                         },
                         Err(_)=>()  
                     }
