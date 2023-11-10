@@ -41,18 +41,18 @@ impl PlayField {
     }
 
     
-    pub fn strike(&mut self, position:(u8,u8))->Result<bool,()>{
+    pub fn strike(&mut self, position:(u8,u8))->Result<(),()>{
         let (x,y) = position;
         let val = self.field[x as usize][y as usize]; 
 
         match val {
             0=>{
                 self.field[x as usize][y as usize]=2;
-                return Ok(false);
+                return Err(());
             }
             1=>{
                 self.field[x as usize][y as usize]=3;
-                return Ok(true);
+                return Ok(());
             }
             _=> return Err(())
         }

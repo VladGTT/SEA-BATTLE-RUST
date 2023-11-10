@@ -2,18 +2,12 @@ mod play_field;
 mod my_window;
 mod connection;
 
-
 use once_cell::sync::Lazy;
-use std::sync::{Mutex,MutexGuard};
-use std::{thread,time};
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
+use std::sync::Mutex;
+use fltk::{window,enums,app,prelude::*};
 
 use play_field::PlayField;
 use my_window::{MyWindow,PrepareWindow,MatchWindow,Visible};
-
-use fltk::{window,enums,app,prelude::*};
-
 use connection::Connection;
 
 const MAX_4DECK: i32 = 1;
@@ -23,7 +17,6 @@ const MAX_1DECK: i32 = 4;
 
 const SOCKET_INPUT: &str = "localhost:8888"; 
 const SOCKET_OUTPUT: &str = "localhost:8889"; 
-
 
 #[derive(Clone,Copy)]
 enum CustomEvents{
@@ -36,17 +29,30 @@ enum CustomEvents{
     ConnectAsClient,
 }    
 
-
-
 static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
 
 static INPUT: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
 static OUTPUT: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
 
+static CURRENT_MATCH: Lazy<Mutex<Match>> = Lazy::new(|| Mutex::new(Match::default()));
+
+
+struct Match{
+    player_ready: bool,
+    opponent_ready: bool,
+    is_server: bool,
+
+    last_coords: (u8,u8)
+}
 
 
 
+impl Default for Match {
+    fn default() -> Self {
+        Match {player_ready:false,opponent_ready:false,is_server:false,last_coords: (255,255)}
+    }
+}
 
 fn main() {
 
@@ -66,6 +72,7 @@ fn main() {
 
     if mode_str == "server" {
         s.send(CustomEvents::ConnectAsServer);
+        CURRENT_MATCH.lock().unwrap().is_server=true;
     } else {
         s.send(CustomEvents::ConnectAsClient);        
     }
@@ -84,42 +91,47 @@ fn main() {
 
 
     let handle_strike = |buf: &[u8;3]|{
-        if (buf[1], buf[2]) == (255,255)  {
-            println!("Hit");
-            return;
-    
-        } else if (buf[1], buf[2]) == (254,254) {
-            println!("Miss");
-            return;
-            
-        } else {
-    
-            println!("Message delivered successfully");
-            let mut player_field=PLAYER_FIELD.lock().unwrap();
-            let mut output = OUTPUT.lock().unwrap();
-            match player_field.strike((buf[1],buf[2])){
-                Ok(confirm)=>{
-                    output.write(&[1,255,255]);
-                },
-                Err(_)=>{
-                    output.write(&[2,254,254]);
+        match buf {
+            [_,255,255] => {
+                println!("Hit");
+            },
+            [_,254,254] => {
+                println!("Miss");
+            },
+            [253,253,253] => {
+                let mut current_match = CURRENT_MATCH.lock().unwrap();
+                current_match.opponent_ready=true;
+                println!("Opponent is ready");
+            },
+            _=>{
+                println!("Message delivered successfully");
+                let mut player_field=PLAYER_FIELD.lock().unwrap();
+                let mut output = OUTPUT.lock().unwrap();
+                // let mut current_match = CURRENT_MATCH.lock().unwrap();
+                
+                match player_field.strike((buf[1],buf[2])){
+                    Ok(confirm)=>{
+                        output.write(&[1,255,255]);
+                    },
+                    Err(_)=>{
+                        output.write(&[2,254,254]);
+                    }
                 }
+                
             }
         }
     };
 
-
-
-
-
-
-
+    let handle_player_strike = |coords: (u8,u8)|{
+        let mut current_match = CURRENT_MATCH.lock().unwrap();
+        current_match.last_coords=coords;
+    };
 
     let mut wind = window::Window::default().with_size(800, 600);
     wind.set_label("SEA BATTLE");
     let mut prep_window = MyWindow::new_prep_window(s,pt_callback);
 
-    let mut match_window = MyWindow::new_match_window(s,pt_callback,ot_callback);
+    let mut match_window = MyWindow::new_match_window(s,pt_callback,ot_callback,handle_player_strike);
     match_window.hide();
 
     wind.make_resizable(true);
@@ -150,6 +162,14 @@ fn main() {
                 },
                 CustomEvents::Ready=>{
                     println!("Ready");
+                    
+                    let mut current_match = CURRENT_MATCH.lock().unwrap();
+
+                    current_match.player_ready=true;
+                    
+                    let mut output=OUTPUT.lock().unwrap();
+                    output.write(&[253,253,253]);
+
                     prep_window.hide();
                     match_window.show();
                     
@@ -160,33 +180,52 @@ fn main() {
                 },
                 CustomEvents::PlayerStrikes=>{
                     println!("Player strikes");
+
+                    let mut current_match = CURRENT_MATCH.lock().unwrap();
+                    
+                    if !(current_match.player_ready && current_match.opponent_ready) {continue;}
+
+
                     let mut output=OUTPUT.lock().unwrap();
-                    output.write(&[30,5,5]);
+
+
+                    output.write(&[30,current_match.last_coords.0,current_match.last_coords.1]);
                 },
                 CustomEvents::ConnectAsServer=>{
                     
-                    thread::spawn(move ||{
+                    std::thread::spawn(move ||{
                         let mut input = INPUT.lock().unwrap();
-                        input.connect_as_server(SOCKET_INPUT);
+                        match input.connect_as_server(SOCKET_INPUT){
+                            Ok(_)=>println!("Input connected"),
+                            Err(_)=>println!("Input connection error")
+                        }
 
                         input.listen(handle_strike);
                     });
-                    thread::spawn(move ||{
+                    std::thread::spawn(move ||{
                         let mut output = OUTPUT.lock().unwrap();
-                        output.connect_as_server(SOCKET_OUTPUT);
+                        match output.connect_as_server(SOCKET_OUTPUT){
+                            Ok(_)=>println!("Output connected"),
+                            Err(_)=>println!("Output connection error")
+                        }
                     });
-
                 },
                 CustomEvents::ConnectAsClient=>{
-                    thread::spawn(move ||{
+                    std::thread::spawn(move ||{
                         let mut input = INPUT.lock().unwrap();
-                        input.connect_as_client(SOCKET_OUTPUT);
+                        match input.connect_as_client(SOCKET_OUTPUT){
+                            Ok(_)=>println!("Input connected"),
+                            Err(_)=>println!("Input connection error")
+                        }
 
                         input.listen(handle_strike);
                     });
-                    thread::spawn(move ||{
+                    std::thread::spawn(move ||{
                         let mut output = OUTPUT.lock().unwrap();
-                        output.connect_as_client(SOCKET_INPUT);
+                        match output.connect_as_client(SOCKET_INPUT){
+                            Ok(_)=>println!("Output connected"),
+                            Err(_)=>println!("Output connection error")
+                        }
                     });
                 },
             }

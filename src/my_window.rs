@@ -20,7 +20,7 @@ pub trait PrepareWindow{
 }
 
 pub trait MatchWindow{
-    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8)->Self;
+    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8,strike_callback: fn((u8,u8)))->Self;
 }
 
 pub struct MyWindow{
@@ -213,7 +213,7 @@ fn draw_data(x: i32, y: i32, w: i32, h: i32, selected: bool, value: u8) {
 
 
 impl MatchWindow for MyWindow {
-    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8)-> Self {
+    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8,strike_callback: fn((u8,u8)))-> Self {
         let mut group=group::Group::new(0,0,800,600,None);
 
         let mut player_table = table::Table::default().with_size(427, 427);
@@ -270,8 +270,11 @@ impl MatchWindow for MyWindow {
             _ => (),
         });
         
-        opponent_table.handle(move|_, event| match event{
+        opponent_table.handle(move|table, event| match event{
             Event::Released => {
+                let coords = table.get_selection();
+                strike_callback((coords.0 as u8, coords.1 as u8));
+
                 sender.send(CustomEvents::PlayerStrikes);
                 true
             }
