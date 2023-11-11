@@ -58,7 +58,30 @@ impl PlayField {
         }
     }
 
+    pub fn mark_as_hit(&mut self, position:(u8,u8))->Result<(),()>{
+        let (x,y) = position;
+        let val = self.field[x as usize][y as usize]; 
+        match val {
+            0=>{
+                self.field[x as usize][y as usize]=3;
+                return Ok(());
+            }                        
+            _=> return Err(())
+        }
+        
+    }
 
+    pub fn mark_as_miss(&mut self, position:(u8,u8))->Result<(),()>{
+        let (x,y) = position;
+        let val = self.field[x as usize][y as usize]; 
+        match val {
+            0=>{
+                self.field[x as usize][y as usize]=2;
+                return Ok(());
+            }                        
+            _=> return Err(())
+        }
+    }
 
     pub fn place_ship(play_field: &mut PlayField,selection:(i32,i32,i32,i32))->Result<(),()>{
         

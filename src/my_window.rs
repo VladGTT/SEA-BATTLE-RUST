@@ -24,7 +24,7 @@ pub trait MatchWindow{
 }
 
 pub struct MyWindow{
-    group: group::Group,
+    pub group: group::Group,
 }
 
 impl PrepareWindow for MyWindow{
