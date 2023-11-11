@@ -3,7 +3,7 @@ use fltk::{
     prelude::{WidgetExt, *},
     *, app::Sender, table::Table, frame::Frame,
 };
-use crate::CustomEvents;
+use crate::{GameEvent,GameEventType};
 use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 // use crate::PLAYER_FIELD;
 const COLOR:Color=Color::DarkRed;
@@ -14,13 +14,13 @@ pub trait Visible{
 }
 
 pub trait PrepareWindow{
-    fn new_prep_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8)->Self;
+    fn new_prep_window(sender:Sender<GameEvent>,player_table_callback: fn((i32,i32))->u8)->Self;
     fn reset(&mut self);
     fn place_ship(&mut self,func: fn((i32,i32,i32,i32))->(i32,i32,i32,i32));
 }
 
 pub trait MatchWindow{
-    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8,strike_callback: fn((u8,u8)))->Self;
+    fn new_match_window(sender:Sender<GameEvent>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8)->Self;
 }
 
 pub struct MyWindow{
@@ -28,7 +28,7 @@ pub struct MyWindow{
 }
 
 impl PrepareWindow for MyWindow{
-    fn new_prep_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8)->Self{
+    fn new_prep_window(sender:Sender<GameEvent>,player_table_callback: fn((i32,i32))->u8)->Self{
         let mut group=group::Group::new(0,0,800,600,None);
     
     
@@ -40,13 +40,13 @@ impl PrepareWindow for MyWindow{
             .with_size(100, 50)
             .with_label("Reset");
     
-        reset_btn.set_callback(move|_|sender.send(CustomEvents::ResetField));
+        reset_btn.set_callback(move|_|sender.send(GameEvent { event_type: GameEventType::ResetField, data: None }));
     
         let mut ready_btn = button::Button::default()
             .with_pos(630, y_pos+250)
             .with_size(100, 50)
             .with_label("Ready");
-        ready_btn.set_callback( move|_|sender.send(CustomEvents::Ready));
+        ready_btn.set_callback( move|_|sender.send(GameEvent { event_type: GameEventType::PlayerReady, data: None }));
     
     
     
@@ -110,7 +110,7 @@ impl PrepareWindow for MyWindow{
         
         table.handle(move|_, event| match event{
             Event::Released => {
-                sender.send(CustomEvents::ShipPlaced);
+                sender.send(GameEvent { event_type: GameEventType::ShipPlaced, data: None });
                 true
             }
             _ => false,
@@ -213,7 +213,7 @@ fn draw_data(x: i32, y: i32, w: i32, h: i32, selected: bool, value: u8) {
 
 
 impl MatchWindow for MyWindow {
-    fn new_match_window(sender:Sender<CustomEvents>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8,strike_callback: fn((u8,u8)))-> Self {
+    fn new_match_window(sender:Sender<GameEvent>,player_table_callback: fn((i32,i32))->u8,opponent_table_callback: fn((i32,i32))->u8)-> Self {
         let mut group=group::Group::new(0,0,800,600,None);
 
         let mut player_table = table::Table::default().with_size(427, 427);
@@ -273,9 +273,9 @@ impl MatchWindow for MyWindow {
         opponent_table.handle(move|table, event| match event{
             Event::Released => {
                 let coords = table.get_selection();
-                strike_callback((coords.0 as u8, coords.1 as u8));
+                // strike_callback((coords.0 as u8, coords.1 as u8));
 
-                sender.send(CustomEvents::PlayerStrikes);
+                sender.send(GameEvent { event_type: GameEventType::PlayerStrikes, data: Some([coords.0 as u8, coords.1 as u8]) });
                 true
             }
             _ => false,

@@ -2,7 +2,12 @@ use std::net::{TcpStream,TcpListener};
 use std::io::{Read, Write};
 use fltk::app::Sender;
 
-use crate::CustomEvents;
+
+
+use crate::{GameEvent,GameEventType};
+
+
+
 pub struct Connection{
     stream:Option<TcpStream>,
 }
@@ -13,22 +18,22 @@ impl Default for Connection{
 }
 
 impl Connection{
-    pub fn connect_as_server(&mut self, socket: &str, func: fn(&[u8;3]),sender:Sender<CustomEvents>)->Result<(),()>{
+    pub fn connect_as_server(&mut self, socket: &str, sender:Sender<GameEvent>)->Result<(),()>{
         match TcpListener::bind(socket).unwrap().accept(){
             Ok((stream,_)) =>{
                 self.stream=Some(stream);
-                Self::listen(self.stream.as_ref().unwrap(), func,sender);
+                Self::listen(self.stream.as_ref().unwrap(), sender);
                 Ok(())
             },
             Err(_) => Err(())
         }    
 
     }
-    pub fn connect_as_client(&mut self, socket: &str, func: fn(&[u8;3]),sender:Sender<CustomEvents>)->Result<(),()>{
+    pub fn connect_as_client(&mut self, socket: &str,sender:Sender<GameEvent>)->Result<(),()>{
         match TcpStream::connect(socket){
             Ok(stream) =>{
                 self.stream=Some(stream);
-                Self::listen(self.stream.as_ref().unwrap(), func,sender);
+                Self::listen(self.stream.as_ref().unwrap(),sender);
                 Ok(())
             },
             Err(_) => Err(())
@@ -58,17 +63,21 @@ impl Connection{
     //     }
     // }
 
-    fn listen(str: &TcpStream,func: fn(&[u8;3]),sender:Sender<CustomEvents>){
+    fn listen(str: &TcpStream,sender:Sender<GameEvent>){
         let mut stream=str.try_clone().unwrap();
         std::thread::spawn(move ||{
-            let mut buf = [0 as u8;3];
+            let mut buf = [0 as u8;2];
             loop{
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 match stream.read(&mut buf){
                     Ok(_)=>{
-                        if buf == [0,0,0]{continue;}
-                        sender.send(CustomEvents::OpponentStrikes);
-                        func(&buf); 
+                        match buf {
+                            [0,0] => continue,
+                            [253,253] =>sender.send(GameEvent { event_type: GameEventType::OpponentReady, data: None }),
+                            [255,255] => sender.send(GameEvent { event_type: GameEventType::PlayerHits, data: Some(buf) }),
+                            [254,254] => sender.send(GameEvent { event_type: GameEventType::PlayerMisses, data: Some(buf) }),
+                            _=>sender.send(GameEvent { event_type: GameEventType::OpponentStrikes, data: Some(buf) })
+                        } 
                     },
                     Err(_)=>()  
                 }
