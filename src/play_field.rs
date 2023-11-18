@@ -29,11 +29,6 @@ impl Default for PlayField{
 
 impl PlayField {
     pub fn reset(&mut self){
-        // for i in 0..10{
-        //     for j in 0..10{
-        //         self.field[i][j]=0;
-        //     } 
-        // }
         self.field=[[0 as u8;10];10];
 
         self.numb_4deck=0;
@@ -162,7 +157,7 @@ impl PlayField {
         self.field[x as usize][y as usize]=2;
     }
 
-    pub fn mark_as_kill(&mut self, coords:(i32,i32,i32,i32))->i32{
+    pub fn mark_as_kill(&mut self, coords:(i32,i32,i32,i32)){
 
         let (mut rt, mut cl, mut rb, mut cr) = (
             coords.0 - 1,
@@ -192,7 +187,14 @@ impl PlayField {
             }
         }
 
-        Self::check_ship_deck(coords).unwrap()
+        match Self::check_ship_deck(coords).unwrap(){
+            1=>self.numb_1deck-=1,
+            2=>self.numb_2deck-=1,
+            3=>self.numb_3deck-=1,
+            4=>self.numb_4deck-=1,
+            _=>()
+        };
+
     }
 
     fn check_ship_deck(selection: (i32, i32, i32, i32)) -> Option<i32>{
