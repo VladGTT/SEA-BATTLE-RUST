@@ -51,18 +51,6 @@ impl Connection{
         }
     }
     
-    // pub fn read(&mut self,buf: &mut [u8])->Result<(),()>{
-    //     match self.stream{
-    //         Some(ref mut str)=>{
-    //             match str.read(buf){
-    //                 Ok(_)=>Ok(()),
-    //                 Err(_)=>Err(())
-    //             }
-    //         },
-    //         None=>Err(())
-    //     }
-    // }
-
     fn listen(str: &TcpStream,sender:Sender<GameEvent>){
         let mut stream=str.try_clone().unwrap();
         std::thread::spawn(move ||{
@@ -76,7 +64,8 @@ impl Connection{
                             [253,253] =>sender.send(GameEvent { event_type: GameEventType::OpponentReady, data: None }),
                             [255,255] => sender.send(GameEvent { event_type: GameEventType::PlayerHits, data: Some(buf) }),
                             [254,254] => sender.send(GameEvent { event_type: GameEventType::PlayerMisses, data: Some(buf) }),
-                            _=>sender.send(GameEvent { event_type: GameEventType::OpponentStrikes, data: Some(buf) })
+                            [252,252] => sender.send(GameEvent { event_type: GameEventType::PlayerKills, data: Some(buf) }),
+                            _=>sender.send(GameEvent { event_type: GameEventType::OpponentStrikes, data: Some([buf[0]-1,buf[1]-1]) })
                         } 
                     },
                     Err(_)=>()  

@@ -1,5 +1,10 @@
 use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 
+pub enum StrikeResponce{
+    Hit,
+    Miss,
+    Kill,
+}
 
 pub struct PlayField{
     pub field:[[u8; 10]; 10],
@@ -24,11 +29,13 @@ impl Default for PlayField{
 
 impl PlayField {
     pub fn reset(&mut self){
-        for i in 0..10{
-            for j in 0..10{
-                self.field[i][j]=0;
-            } 
-        }
+        // for i in 0..10{
+        //     for j in 0..10{
+        //         self.field[i][j]=0;
+        //     } 
+        // }
+        self.field=[[0 as u8;10];10];
+
         self.numb_4deck=0;
         self.numb_3deck=0;
         self.numb_2deck=0;
@@ -40,64 +47,170 @@ impl PlayField {
         (self.numb_1deck,self.numb_2deck,self.numb_3deck,self.numb_4deck)
     }
 
-    
-    pub fn strike(&mut self, position:(u8,u8))->Result<(),()>{
-        let (x,y) = position;
-        let val = self.field[x as usize][y as usize]; 
+    pub fn check_if_killed(&self,position:(u8,u8))->Option<(i32,i32,i32,i32)>{
+        let (x,y) = (position.0 as i32, position.1 as i32);
 
-        match val {
+        let mut hit_coords = (x,y,x,y);
+
+        if x!=0{
+            let mut i=1;
+            while x-i >= 0{
+
+                let data = self.field[(x-i) as usize][y as usize]; 
+                
+                if data == 1{
+                    return None;
+                }
+                if data != 3{
+                    break;
+                }               
+                
+                hit_coords.0=x-i;
+                i+=1;
+                
+            }
+        }
+
+        
+        if y!=0{
+            let mut i=1;
+            while y-i>=0{
+
+                let data = self.field[x as usize][(y-i) as usize]; 
+                
+                if data == 1{
+                    return None;
+                }
+                if data != 3{
+                    break;
+                }               
+                
+                hit_coords.1=y-i;
+                i+=1;
+                
+            }
+        }
+
+        if x!=9{
+            let mut i=1;
+            while x+i<=9{
+
+                let data = self.field[(x+i) as usize][y as usize];
+
+                if data == 1{
+                    return None;
+                }
+                if data != 3{
+                    break;
+                } 
+                hit_coords.2=x+i;
+                i+=1;
+                
+            }
+        }
+        if y!=9{
+            let mut i=1;
+            while y+i<=9{
+
+                let data = self.field[x as usize][(y+i) as usize];
+
+                if data == 1{
+                    return None;
+                }
+                if data != 3{
+                    break;
+                } 
+                hit_coords.3=y+i;
+                i+=1;
+                
+            }
+        }
+
+        Some(hit_coords)
+    }
+    
+    pub fn strike(&mut self, position:(u8,u8))->StrikeResponce{
+        match self.field[position.0 as usize][position.1 as usize] {
             0=>{
-                self.field[x as usize][y as usize]=2;
-                return Err(());
+                self.mark_as_miss(position);
+                StrikeResponce::Miss
             }
             1=>{
-                self.field[x as usize][y as usize]=3;
-                return Ok(());
+                self.mark_as_hit(position);
+                match self.check_if_killed(position){
+                    Some(coords)=>{
+                        self.mark_as_kill(coords);
+                        StrikeResponce::Kill
+                    }
+                    None=>StrikeResponce::Hit
+                }
+
             }
-            _=> return Err(())
+            _=> StrikeResponce::Miss
         }
     }
 
-    pub fn mark_as_hit(&mut self, position:(u8,u8))->Result<(),()>{
+    pub fn mark_as_hit(&mut self, position:(u8,u8)){
         let (x,y) = position;
-        let val = self.field[x as usize][y as usize]; 
-        match val {
-            0=>{
-                self.field[x as usize][y as usize]=3;
-                return Ok(());
-            }                        
-            _=> return Err(())
-        }
-        
+        self.field[x as usize][y as usize]=3;
     }
 
-    pub fn mark_as_miss(&mut self, position:(u8,u8))->Result<(),()>{
+    
+
+    pub fn mark_as_miss(&mut self, position:(u8,u8)){
         let (x,y) = position;
-        let val = self.field[x as usize][y as usize]; 
-        match val {
-            0=>{
-                self.field[x as usize][y as usize]=2;
-                return Ok(());
-            }                        
-            _=> return Err(())
+        self.field[x as usize][y as usize]=2;
+    }
+
+    pub fn mark_as_kill(&mut self, coords:(i32,i32,i32,i32))->i32{
+
+        let (mut rt, mut cl, mut rb, mut cr) = (
+            coords.0 - 1,
+            coords.1 - 1,
+            coords.2 + 1,
+            coords.3 + 1,
+        );
+
+        if rt < 0 {
+            rt = 0;
         }
+        if cl < 0 {
+            cl = 0
+        }
+        if rb >= 10 {
+            rb = 9;
+        }
+        if cr >= 10 {
+            cr = 9;
+        }
+    
+        for i in rt..rb + 1 {
+            for j in cl..cr + 1 {
+                if self.field[i as usize][j as usize] == 0 {
+                    self.field[i as usize][j as usize]=2;
+                }
+            }
+        }
+
+        Self::check_ship_deck(coords).unwrap()
+    }
+
+    fn check_ship_deck(selection: (i32, i32, i32, i32)) -> Option<i32>{
+        let height = selection.2 - selection.0;
+        let width = selection.3 - selection.1;
+    
+        if height == 0 {
+            return Some(width + 1);
+        }
+        if width == 0 {
+            return Some(height + 1);
+        }
+        None
     }
 
     pub fn place_ship(play_field: &mut PlayField,selection:(i32,i32,i32,i32))->Result<(),()>{
         
         
-        let check_ship_deck = |selection: (i32, i32, i32, i32)| -> Result<i32, ()> {
-            let height = selection.2 - selection.0;
-            let width = selection.3 - selection.1;
-        
-            if height == 0 {
-                return Ok(width + 1);
-            }
-            if width == 0 {
-                return Ok(height + 1);
-            }
-            Err(())
-        };
         
         let check_surroundings_and_intersection = |selection: (i32, i32, i32, i32),field: &[[u8;10];10] |->bool{
             let (mut rt, mut cl, mut rb, mut cr) = (
@@ -154,9 +267,9 @@ impl PlayField {
         };
         
         
-        let deck_num = match check_ship_deck(selection) {
-            Ok(res) => res,
-            Err(_) => {
+        let deck_num = match Self::check_ship_deck(selection) {
+            Some(res) => res,
+            None => {
                 return Err(());
             }
         };

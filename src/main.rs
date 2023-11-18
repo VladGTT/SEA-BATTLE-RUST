@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use fltk::{window,enums,app,prelude::*};
 
-use play_field::PlayField;
+use play_field::{PlayField,StrikeResponce};
 use my_window::{MyWindow,PrepareWindow,MatchWindow,Visible};
 use connection::Connection;
 
@@ -14,6 +14,7 @@ use connection::Connection;
 pub enum GameEventType{
     PlayerHits,
     PlayerMisses,
+    PlayerKills,
     OpponentStrikes,
     OpponentReady,
     PlayerReady,
@@ -36,6 +37,7 @@ impl GameEventType{
         match arg{
             GameEventType::PlayerHits=>Ok([255,255]),
             GameEventType::PlayerMisses=>Ok([254,254]),
+            GameEventType::PlayerKills=>Ok([252,252]),
             GameEventType::OpponentReady=>Ok([253,253]),
             _ => Err(())
         }
@@ -158,8 +160,7 @@ fn main() {
                     }
                     else{
                         CURRENT_MATCH.lock().unwrap().player_ready=true;
-                        CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::OpponentReady).unwrap());
-                        
+                        _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::OpponentReady).unwrap());
                         
                         prep_window.hide();
                         match_window.show();
@@ -179,12 +180,21 @@ fn main() {
                     let mut current_match = CURRENT_MATCH.lock().unwrap();
                     
                     let coords = msg.data.unwrap();
+                    {
+                        let dat = OPPONNENT_FIELD.lock().unwrap().field[coords[0] as usize][coords[1] as usize];
+    
+                        if dat!=0{
+                           continue;
+                        }
+                    }
+
                     current_match.last_coords=(coords[0],coords[1]);
+
 
                     if current_match.player_ready && current_match.opponent_ready && current_match.my_move {
 
                         current_match.my_move=false;
-                        CONNECTION.lock().unwrap().write(&[current_match.last_coords.0,current_match.last_coords.1]);
+                        _ = CONNECTION.lock().unwrap().write(&[current_match.last_coords.0+1,current_match.last_coords.1+1]);
                         println!("Player strikes");
                     
                     }
@@ -194,6 +204,7 @@ fn main() {
                         Ok(_)=>println!("Connected"),
                         Err(_)=>println!("Connection error")
                     }
+                    wind.set_label("SEA BATTLE - SERVER");
                     CURRENT_MATCH.lock().unwrap().my_move=true;
                 },
                 GameEventType::ConnectAsClient=>{
@@ -201,6 +212,7 @@ fn main() {
                         Ok(_)=>println!("Connected"),
                         Err(_)=>println!("Connection error")
                     }
+                    wind.set_label("SEA BATTLE - CLIENT");
                 },
                 GameEventType::OpponentReady=>{
                     CURRENT_MATCH.lock().unwrap().opponent_ready=true;
@@ -220,21 +232,40 @@ fn main() {
                 },
                 GameEventType::PlayerMisses=>{
                     println!("Miss");
-                    let mut current_match = CURRENT_MATCH.lock().unwrap();
+                    let current_match = CURRENT_MATCH.lock().unwrap();
                     OPPONNENT_FIELD.lock().unwrap().mark_as_miss(current_match.last_coords);
-                    
                     match_window.group.redraw();
-
                 },
+                GameEventType::PlayerKills=>{
+                    println!("Kill");
+                    
+                    let mut current_match = CURRENT_MATCH.lock().unwrap();
+                    current_match.my_move=true;
+
+                    let mut opponnent_field = OPPONNENT_FIELD.lock().unwrap(); 
+                    
+                    match opponnent_field.check_if_killed(current_match.last_coords){
+                        Some(coords)=>{
+                            opponnent_field.mark_as_hit(current_match.last_coords);
+                            opponnent_field.mark_as_kill(coords);
+                        },
+                        None=>()
+                    }
+                    match_window.group.redraw();
+                }
                 GameEventType::OpponentStrikes=>{
                     let buf = msg.data.unwrap();
                     match PLAYER_FIELD.lock().unwrap().strike((buf[0],buf[1])){
-                        Ok(_)=>{
-                            CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerHits).unwrap());
+                        StrikeResponce::Hit=>{
+                            _= CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerHits).unwrap());
                         },
-                        Err(_)=>{
-                            CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerMisses).unwrap());
+                        StrikeResponce::Miss=>{
+                            _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerMisses).unwrap());
                             CURRENT_MATCH.lock().unwrap().my_move=true;
+                        }
+                        
+                        StrikeResponce::Kill=>{
+                            _=CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerKills).unwrap());
                         }
                     }
                     match_window.group.redraw();
