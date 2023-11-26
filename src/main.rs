@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use fltk::{window,enums,app,prelude::*};
 
-use play_field::{PlayField,StrikeResponce};
+use play_field::{PlayField,StrikeResponce,Field,GameField,PrepField};
 use my_window::{MyWindow,PrepareWindow,MatchWindow,Visible};
 use connection::Connection;
 
@@ -52,9 +52,9 @@ const MAX_1DECK: i32 = 4;
 const SOCKET: &str = "localhost:8888"; 
 
 
-static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
+static PLAYER_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(Field::new_player_field()));
 
-static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(PlayField::default()));
+static OPPONNENT_FIELD: Lazy<Mutex<PlayField>> = Lazy::new(|| Mutex::new(Field::new_opponent_field()));
 
 static CONNECTION: Lazy<Mutex<Connection>> = Lazy::new(|| Mutex::new(Connection::default()));
 
@@ -107,10 +107,10 @@ fn main() {
     
 
     let pt_callback = |(r,c):(i32,i32)|->u8{
-        PLAYER_FIELD.lock().unwrap().field[r as usize][c as usize]
+        PLAYER_FIELD.lock().unwrap().field[r as usize][c as usize] as u8
     };
     let ot_callback = |(r,c):(i32,i32)|->u8 {
-        OPPONNENT_FIELD.lock().unwrap().field[r as usize][c as usize]
+        OPPONNENT_FIELD.lock().unwrap().field[r as usize][c as usize] as u8
     };
 
     
@@ -142,7 +142,7 @@ fn main() {
                 GameEventType::ShipPlaced =>{
                     prep_window.place_ship(|(rt, cl, rb, cr)|->(i32,i32,i32,i32){                        
                         let mut field = &mut PLAYER_FIELD.lock().unwrap();
-                        let _ = PlayField::place_ship(&mut field,(rt, cl, rb, cr));
+                        field.place_ship((rt, cl, rb, cr));
                         field.get_ship_numb()
                     });
                 },
@@ -180,9 +180,9 @@ fn main() {
                     
                     let coords = msg.data.unwrap();
                     {
-                        let dat = OPPONNENT_FIELD.lock().unwrap().field[coords[0] as usize][coords[1] as usize];
+                        let dat = OPPONNENT_FIELD.lock().unwrap().strike_coords((coords[0],coords[1]));
     
-                        if dat!=0{
+                        if dat!=StrikeResponce::Miss{
                            continue;
                         }
                     }
@@ -255,19 +255,22 @@ fn main() {
                 }
                 GameEventType::OpponentStrikes=>{
                     let buf = msg.data.unwrap();
+                    let coords=(buf[0],buf[1]);
                     let mut player_field=PLAYER_FIELD.lock().unwrap();
-                    match player_field.strike((buf[0],buf[1])){
+                    match player_field.strike_coords(coords){
                         StrikeResponce::Hit=>{
+                            player_field.mark_as_hit(coords);
                             _= CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerHits).unwrap());
                         },
                         StrikeResponce::Miss=>{
+                            player_field.mark_as_miss(coords);
                             _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerMisses).unwrap());
                             let current_match = &mut CURRENT_MATCH;
                             
                             current_match.my_move=true;
                         }
-                        
-                        StrikeResponce::Kill=>{
+                        StrikeResponce::Kill(ship_coords)=>{
+                            player_field.mark_as_kill(ship_coords);
                             if player_field.get_ship_numb() == (0,0,0,0){
                             }
                             _=CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerKills).unwrap());

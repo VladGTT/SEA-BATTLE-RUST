@@ -203,6 +203,7 @@ fn draw_data(x: i32, y: i32, w: i32, h: i32, selected: bool, value: u8) {
         1=>draw::set_draw_color(enums::Color::Green),
         2=>draw::set_draw_color(enums::Color::Blue),
         3=>draw::set_draw_color(enums::Color::Red),
+        4=>draw::set_draw_color(enums::Color::DarkRed),
         _=>()
     }
     draw::draw_rectf(x, y, w, h);
