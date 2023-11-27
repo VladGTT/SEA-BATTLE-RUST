@@ -63,7 +63,6 @@ struct Match{
     opponent_ready: bool,
     my_move: bool,
 
-    
     last_coords: (u8,u8)
 }
 
@@ -82,30 +81,9 @@ fn main() {
     let (s, r) = app::channel::<GameEvent>();
 
 
-    let mut CURRENT_MATCH = Match::default();
-
-    {
-        let mut mode = String::new();
-    
-        let stdin = std::io::stdin();
-    
-        println!("Write mode");
-        
-        stdin.read_line(&mut mode).unwrap();
-    
-        let mode_str=&mode[..mode.len()-2];
+    let mut wind = window::Window::default().with_size(800, 600);
     
     
-        if mode_str == "server" {
-            s.send(GameEvent{event_type: GameEventType::ConnectAsServer,data: None});
-        } else {
-            s.send(GameEvent{event_type: GameEventType::ConnectAsClient,data: None});        
-        }
-    }
-
-
-    
-
     let pt_callback = |(r,c):(i32,i32)|->u8{
         PLAYER_FIELD.lock().unwrap().field[r as usize][c as usize] as u8
     };
@@ -113,18 +91,10 @@ fn main() {
         OPPONNENT_FIELD.lock().unwrap().field[r as usize][c as usize] as u8
     };
 
-    
-    
-    
-    
-    let mut wind = window::Window::default().with_size(800, 600);
-
-    
-
     let mut prep_window = MyWindow::new_prep_window(s,pt_callback);
 
-    let mut match_window = MyWindow::new_match_window(s,pt_callback,ot_callback);
-    match_window.hide();
+    // let mut match_window = MyWindow::new_match_window(s,pt_callback,ot_callback);
+    // match_window.hide();
 
     wind.make_resizable(true);
     wind.end();
@@ -135,152 +105,197 @@ fn main() {
             s.send(GameEvent { event_type: GameEventType::WindowClosed, data: None })
         }
     });
-    
-    while app.wait(){
-        if let Some(msg) = r.recv() {
-            match msg.event_type {
-                GameEventType::ShipPlaced =>{
-                    prep_window.place_ship(|(rt, cl, rb, cr)|->(i32,i32,i32,i32){                        
-                        let mut field = &mut PLAYER_FIELD.lock().unwrap();
-                        field.place_ship((rt, cl, rb, cr));
-                        field.get_ship_numb()
-                    });
-                },
-                GameEventType::ResetField=>{
-                    let mut player_field=PLAYER_FIELD.lock().unwrap();
-                    player_field.reset();   
-                    prep_window.reset();
-                },
-                GameEventType::PlayerReady=>{
-                    
-                    if PLAYER_FIELD.lock().unwrap().get_ship_numb() != (MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK){
-                        println!("Ships are not placed");
-                    }
-                    else{
-                        let current_match = &mut CURRENT_MATCH; 
-                        current_match.player_ready=true;
-                        _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::OpponentReady).unwrap());
-                        
-                        prep_window.hide();
-                        match_window.show();
-                                            
-                        println!("Ready");
-                    }
-                    
-                },                
-                GameEventType::WindowClosed=>{
-                    println!("Closed");
-                    app.quit();
-                },
-                GameEventType::PlayerStrikes=>{
-                    
-                    
-
-                    let current_match = &mut CURRENT_MATCH;
-                    
-                    let coords = msg.data.unwrap();
-                    {
-                        let dat = OPPONNENT_FIELD.lock().unwrap().strike_coords((coords[0],coords[1]));
-    
-                        if dat!=StrikeResponce::Miss{
-                           continue;
-                        }
-                    }
-
-                    current_match.last_coords=(coords[0],coords[1]);
 
 
-                    if current_match.player_ready && current_match.opponent_ready && current_match.my_move {
-                        current_match.my_move=false;
-                        _ = CONNECTION.lock().unwrap().write(&[current_match.last_coords.0+1,current_match.last_coords.1+1]);
-                        println!("Player strikes");
-                    
-                    }
-                },
-                GameEventType::ConnectAsServer=>{
-                    match CONNECTION.lock().unwrap().connect_as_server(SOCKET,s){
-                        Ok(_)=>println!("Connected"),
-                        Err(_)=>println!("Connection error")
-                    }
-                    wind.set_label("SEA BATTLE - SERVER");
-                    let current_match = &mut CURRENT_MATCH;
-                    current_match.my_move=true;
-                },
-                GameEventType::ConnectAsClient=>{
-                    match CONNECTION.lock().unwrap().connect_as_client(SOCKET,s){
-                        Ok(_)=>println!("Connected"),
-                        Err(_)=>println!("Connection error")
-                    }
-                    wind.set_label("SEA BATTLE - CLIENT");
-                },
-                GameEventType::OpponentReady=>{
-                    let current_match = &mut CURRENT_MATCH;
-                    current_match.opponent_ready=true;
-                    println!("Opponent is ready");
-                },
-                GameEventType::PlayerHits=>{
-                    println!("Hit");
-                    
-                    
-                    let current_match = &mut CURRENT_MATCH;
-                        
-                    current_match.my_move=true;
-        
-                    OPPONNENT_FIELD.lock().unwrap().mark_as_hit(current_match.last_coords);
-                    match_window.group.redraw();
+    {
+        while app.wait(){
+            if let Some(msg) = r.recv() {
 
-                },
-                GameEventType::PlayerMisses=>{
-                    println!("Miss");
-                    let current_match = &mut CURRENT_MATCH;
-                    OPPONNENT_FIELD.lock().unwrap().mark_as_miss(current_match.last_coords);
-                    match_window.group.redraw();
-                },
-                GameEventType::PlayerKills=>{
-                    println!("Kill");
-                    
-                    let current_match = &mut CURRENT_MATCH;
-                    current_match.my_move=true;
-
-                    let mut opponnent_field = OPPONNENT_FIELD.lock().unwrap(); 
-                    
-                    match opponnent_field.check_if_killed(current_match.last_coords){
-                        Some(coords)=>{
-                            opponnent_field.mark_as_hit(current_match.last_coords);
-                            opponnent_field.mark_as_kill(coords);
-                        },
-                        None=>()
-                    }                    
-                    match_window.group.redraw();
-                }
-                GameEventType::OpponentStrikes=>{
-                    let buf = msg.data.unwrap();
-                    let coords=(buf[0],buf[1]);
-                    let mut player_field=PLAYER_FIELD.lock().unwrap();
-                    match player_field.strike_coords(coords){
-                        StrikeResponce::Hit=>{
-                            player_field.mark_as_hit(coords);
-                            _= CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerHits).unwrap());
-                        },
-                        StrikeResponce::Miss=>{
-                            player_field.mark_as_miss(coords);
-                            _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerMisses).unwrap());
-                            let current_match = &mut CURRENT_MATCH;
-                            
-                            current_match.my_move=true;
-                        }
-                        StrikeResponce::Kill(ship_coords)=>{
-                            player_field.mark_as_kill(ship_coords);
-                            if player_field.get_ship_numb() == (0,0,0,0){
-                            }
-                            _=CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerKills).unwrap());
-                        }
-                    }
-                    match_window.group.redraw();
-                }
             }
+
         }
-    };
+    }
+
+
+
+    // let mut CURRENT_MATCH = Match::default();
+
+    // {
+    //     let mut mode = String::new();
+    
+    //     let stdin = std::io::stdin();
+    
+    //     println!("Write mode");
+        
+    //     stdin.read_line(&mut mode).unwrap();
+    
+    //     let mode_str=&mode[..mode.len()-2];
+    
+    
+    //     if mode_str == "server" {
+    //         match CONNECTION.lock().unwrap().connect_as_server(SOCKET,s){
+    //             Ok(_)=>println!("Connected"),
+    //             Err(_)=>println!("Connection error")
+    //         }
+    //         wind.set_label("SEA BATTLE - SERVER");
+
+    //         let current_match = &mut CURRENT_MATCH;
+    //         current_match.my_move=true;
+        
+    //     } else {
+    //         match CONNECTION.lock().unwrap().connect_as_client(SOCKET,s){
+    //             Ok(_)=>println!("Connected"),
+    //             Err(_)=>println!("Connection error")
+    //         }
+    //         wind.set_label("SEA BATTLE - CLIENT");
+    //     }
+    // }
+
+
+    
     app.run().unwrap();
+
+    
+    
+    
+    
+    
+    
+    
+    // while app.wait(){
+    //     if let Some(msg) = r.recv() {
+    //         match msg.event_type {
+    //             GameEventType::ShipPlaced =>{
+    //                 prep_window.place_ship(|(rt, cl, rb, cr)|->(i32,i32,i32,i32){                        
+    //                     let mut field = &mut PLAYER_FIELD.lock().unwrap();
+    //                     field.place_ship((rt, cl, rb, cr));
+    //                     field.get_ship_numb()
+    //                 });
+    //             },
+    //             GameEventType::ResetField=>{
+    //                 let mut player_field=PLAYER_FIELD.lock().unwrap();
+    //                 player_field.reset();   
+    //                 prep_window.reset();
+    //             },
+    //             GameEventType::PlayerReady=>{
+                    
+    //                 if PLAYER_FIELD.lock().unwrap().get_ship_numb() != (MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK){
+    //                     println!("Ships are not placed");
+    //                 }
+    //                 else{
+    //                     let current_match = &mut CURRENT_MATCH; 
+    //                     current_match.player_ready=true;
+    //                     _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::OpponentReady).unwrap());
+                        
+    //                     prep_window.hide();
+    //                     match_window.show();
+                                            
+    //                     println!("Ready");
+    //                 }
+                    
+    //             },                
+    //             GameEventType::WindowClosed=>{
+    //                 println!("Closed");
+    //                 app.quit();
+    //             },
+    //             GameEventType::PlayerStrikes=>{
+                    
+                    
+
+    //                 let current_match = &mut CURRENT_MATCH;
+                    
+    //                 let coords = msg.data.unwrap();
+    //                 {
+    //                     let dat = OPPONNENT_FIELD.lock().unwrap().strike_coords((coords[0],coords[1]));
+    
+    //                     if dat!=StrikeResponce::Miss{
+    //                        continue;
+    //                     }
+    //                 }
+
+    //                 current_match.last_coords=(coords[0],coords[1]);
+
+
+    //                 if current_match.player_ready && current_match.opponent_ready && current_match.my_move {
+    //                     current_match.my_move=false;
+    //                     _ = CONNECTION.lock().unwrap().write(&[current_match.last_coords.0+1,current_match.last_coords.1+1]);
+    //                     println!("Player strikes");
+                    
+    //                 }
+    //             },
+    //             GameEventType::ConnectAsServer=>{
+    //                 
+    //             },
+    //             GameEventType::ConnectAsClient=>{
+    //                 
+    //             },
+    //             GameEventType::OpponentReady=>{
+    //                 let current_match = &mut CURRENT_MATCH;
+    //                 current_match.opponent_ready=true;
+    //                 println!("Opponent is ready");
+    //             },
+    //             GameEventType::PlayerHits=>{
+    //                 println!("Hit");
+                    
+                    
+    //                 let current_match = &mut CURRENT_MATCH;
+                        
+    //                 current_match.my_move=true;
+        
+    //                 OPPONNENT_FIELD.lock().unwrap().mark_as_hit(current_match.last_coords);
+    //                 match_window.group.redraw();
+
+    //             },
+    //             GameEventType::PlayerMisses=>{
+    //                 println!("Miss");
+    //                 let current_match = &mut CURRENT_MATCH;
+    //                 OPPONNENT_FIELD.lock().unwrap().mark_as_miss(current_match.last_coords);
+    //                 match_window.group.redraw();
+    //             },
+    //             GameEventType::PlayerKills=>{
+    //                 println!("Kill");
+                    
+    //                 let current_match = &mut CURRENT_MATCH;
+    //                 current_match.my_move=true;
+
+    //                 let mut opponnent_field = OPPONNENT_FIELD.lock().unwrap(); 
+                    
+    //                 match opponnent_field.check_if_killed(current_match.last_coords){
+    //                     Some(coords)=>{
+    //                         opponnent_field.mark_as_hit(current_match.last_coords);
+    //                         opponnent_field.mark_as_kill(coords);
+    //                     },
+    //                     None=>()
+    //                 }                    
+    //                 match_window.group.redraw();
+    //             }
+    //             GameEventType::OpponentStrikes=>{
+    //                 let buf = msg.data.unwrap();
+    //                 let coords=(buf[0],buf[1]);
+    //                 let mut player_field=PLAYER_FIELD.lock().unwrap();
+    //                 match player_field.strike_coords(coords){
+    //                     StrikeResponce::Hit=>{
+    //                         player_field.mark_as_hit(coords);
+    //                         _= CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerHits).unwrap());
+    //                     },
+    //                     StrikeResponce::Miss=>{
+    //                         player_field.mark_as_miss(coords);
+    //                         _ = CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerMisses).unwrap());
+    //                         let current_match = &mut CURRENT_MATCH;
+                            
+    //                         current_match.my_move=true;
+    //                     }
+    //                     StrikeResponce::Kill(ship_coords)=>{
+    //                         player_field.mark_as_kill(ship_coords);
+    //                         if player_field.get_ship_numb() == (0,0,0,0){
+    //                         }
+    //                         _=CONNECTION.lock().unwrap().write(&GameEventType::type_to_data(GameEventType::PlayerKills).unwrap());
+    //                     }
+    //                 }
+    //                 match_window.group.redraw();
+    //             }
+    //         }
+    //     }
+    // };
     
 }

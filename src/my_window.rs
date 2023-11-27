@@ -5,7 +5,6 @@ use fltk::{
 };
 use crate::{GameEvent,GameEventType};
 use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
-// use crate::PLAYER_FIELD;
 const COLOR:Color=Color::DarkRed;
 
 pub trait Visible{
