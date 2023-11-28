@@ -1,59 +1,93 @@
-use crate::play_field::PrepField;
+use fltk::{
+    enums::{ Color, Event, Font},
+    prelude::{WidgetExt, *},
+    *, app::Sender, table::Table, frame::Frame, button::Button,
+};
+
+use crate::play_field::{Field, PlayField};
+use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
+use crate::draw_table::{draw_data,draw_header};
+
+const COLOR:Color=Color::DarkRed;
+const DEFAULT_COLOR:Color=Color::Black;
 
 #[derive(Copy,Clone)]
-enum BattlePreparationEvents{
-    ShipPlaced(i32,i32,i32,i32),
+pub enum BattlePreparationEvents{
+    ShipPlaced((i32,i32,i32,i32)),
     Ready,
     Reset
 }
 
 pub struct BattlePrepWindow{
     pub group: group::Group,
+    table: Table,
 }
 
 
 impl BattlePrepWindow{
-    fn draw_header (txt: &str, x: i32, y: i32, w: i32, h: i32) {
-        draw::push_clip(x, y, w, h);
-        draw::draw_box(enums::FrameType::ThinUpBox,x,y,w,h,enums::Color::FrameDefault);
-        draw::set_draw_color(enums::Color::Black);
-        draw::set_font(enums::Font::Helvetica, 14);
-        draw::draw_text2(txt, x, y, w, h, enums::Align::Center);
-        draw::pop_clip();
-    }
-    fn draw_data(x: i32, y: i32, w: i32, h: i32, selected: bool, value: u8) {
-        draw::push_clip(x, y, w, h);
     
-        if selected {
-            draw::set_draw_color(enums::Color::from_u32(0x00D3_D3D3));
-        } else {
-            draw::set_draw_color(enums::Color::White);
-        }
-        match value{
-            1=>draw::set_draw_color(enums::Color::Green),
-            2=>draw::set_draw_color(enums::Color::Blue),
-            3=>draw::set_draw_color(enums::Color::Red),
-            4=>draw::set_draw_color(enums::Color::DarkRed),
-            _=>()
-        }
-        draw::draw_rectf(x, y, w, h);
-        draw::set_draw_color(enums::Color::Gray0);
-        draw::draw_rect(x, y, w, h);
-        draw::pop_clip();
-    }
-
-
-
-
-
-
-
-
-
-    fn draw(data: PlayField){
+    pub fn draw(&mut self,data: &PlayField){      
         
+        let table = &mut self.table;
+        
+        let mut label_4deck = Frame::from_dyn_widget(&self.group.child(1).unwrap()).unwrap();
+        let mut label_3deck = Frame::from_dyn_widget(&self.group.child(2).unwrap()).unwrap();
+        let mut label_2deck = Frame::from_dyn_widget(&self.group.child(3).unwrap()).unwrap();
+        let mut label_1deck = Frame::from_dyn_widget(&self.group.child(4).unwrap()).unwrap();
+
+        let cloned_data=data.clone();
+        table.draw_cell(move |t, ctx, row, col, x, y, w, h| match ctx {
+            table::TableContext::StartPage => draw::set_font(enums::Font::Helvetica, 14),
+            table::TableContext::ColHeader => draw_header(&format!("{}", (col + 65) as u8 as char), x, y, w, h), 
+            table::TableContext::RowHeader => draw_header(&format!("{}", row + 1), x, y, w, h),
+            table::TableContext::Cell => {
+                draw_data(x,y,w,h,t.is_selected(row, col),cloned_data.field[row as usize][col as usize] as u8);
+            }
+            _ => (),
+        });
+
+
+        let update_labels=|label: &mut frame::Frame,remaining_ships: i32,deck_number:i32|{
+            label.set_label(&format!("Ships with {} decks remained: {}",deck_number,remaining_ships));
+            if remaining_ships == 0 {
+                label.set_label_color(COLOR);
+            }
+            else{
+                label.set_label_color(DEFAULT_COLOR);
+            }
+        };
+        
+        let (n_1decks ,n_2decks,n_3decks,n_4decks)=data.get_ship_numb();
+      
+        update_labels(&mut label_4deck ,MAX_4DECK-n_4decks,4);
+        update_labels(&mut label_3deck,MAX_3DECK-n_3decks,3);
+        update_labels(&mut label_2deck,MAX_2DECK-n_2decks,2);
+        update_labels(&mut label_1deck,MAX_1DECK-n_1decks,1);
+
+        self.group.redraw();
     }
-    fn new(sender:Sender<BattlePreparationEvents>,player_table_callback: fn((i32,i32))->u8)->Self{
+
+    pub fn set_handler(&mut self,sender:Sender<BattlePreparationEvents>){
+        let table_sender=sender.clone();
+
+        self.table.handle(move|obj, event| match event{
+            Event::Released => {
+                table_sender.send(BattlePreparationEvents::ShipPlaced(obj.get_selection()));
+                true
+            }
+            _ => false,
+        });
+
+
+        let mut reset_btn = Button::from_dyn_widget(&self.group.child(5).unwrap()).unwrap();
+        reset_btn.set_callback(move|_|sender.send(BattlePreparationEvents::Reset));
+
+
+        let mut ready_btn = Button::from_dyn_widget(&self.group.child(6).unwrap()).unwrap();
+        ready_btn.set_callback( move|_|sender.send(BattlePreparationEvents::Ready));
+    }
+
+    pub fn new()->Self{
         let mut group=group::Group::new(0,0,800,600,None);
     
     
@@ -65,13 +99,12 @@ impl BattlePrepWindow{
             .with_size(100, 50)
             .with_label("Reset");
     
-        reset_btn.set_callback(move|_|sender.send(GameEvent { event_type: GameEventType::ResetField, data: None }));
+       
     
         let mut ready_btn = button::Button::default()
             .with_pos(630, y_pos+250)
             .with_size(100, 50)
             .with_label("Ready");
-        ready_btn.set_callback( move|_|sender.send(GameEvent { event_type: GameEventType::PlayerReady, data: None }));
     
     
     
@@ -123,24 +156,8 @@ impl BattlePrepWindow{
         table.set_col_header_height(25);
         table.end();
     
-        table.draw_cell(move |t, ctx, row, col, x, y, w, h| match ctx {
-            table::TableContext::StartPage => draw::set_font(enums::Font::Helvetica, 14),
-            table::TableContext::ColHeader => draw_header(&format!("{}", (col + 65) as u8 as char), x, y, w, h), 
-            table::TableContext::RowHeader => draw_header(&format!("{}", row + 1), x, y, w, h),
-            table::TableContext::Cell => {
-                draw_data(x,y,w,h,t.is_selected(row, col),player_table_callback((row,col)));
-            }
-            _ => (),
-        });
         
-        table.handle(move|obj, event| match event{
-            Event::Released => {
-                sender.send(BattlePreparationEvents::ShipPlaced(obj.get_selection()));
-                true
-            }
-            _ => false,
-        });
-
+    
         group.add(&table);
         group.add(&label_4deck);
         group.add(&label_3deck);
@@ -151,7 +168,7 @@ impl BattlePrepWindow{
 
         group.end();
 
-        MyWindow {group: group}
+        BattlePrepWindow {group: group,table: table}
     }
 
 }

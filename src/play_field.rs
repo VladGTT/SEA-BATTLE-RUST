@@ -9,6 +9,9 @@ pub enum PlayerFieldCell {
     Ship = 1
 }
 
+
+
+
 pub trait Field {
     fn new_player_field()->Self;
     fn new_opponent_field()->Self;
@@ -50,6 +53,24 @@ pub struct PlayField {
     numb_2deck: i32,
     numb_1deck: i32,
 }
+
+impl Clone for PlayField{
+    fn clone(&self) -> Self {
+        PlayField { field: self.field, 
+            numb_4deck: self.numb_4deck, 
+            numb_3deck: self.numb_3deck, 
+            numb_2deck: self.numb_2deck, 
+            numb_1deck: self.numb_1deck }
+    }
+    fn clone_from(&mut self, source: &Self) {
+        self.field=source.field;
+        self.numb_1deck=source.numb_1deck;
+        self.numb_2deck=source.numb_2deck;
+        self.numb_3deck=source.numb_3deck;
+        self.numb_4deck=source.numb_4deck;
+    }
+}
+
 
 impl Field for PlayField {
     fn new_player_field()->Self {

@@ -97,6 +97,8 @@ impl PrepareWindow for MyWindow{
         table.set_col_header_height(25);
         table.end();
     
+        
+        
         table.draw_cell(move |t, ctx, row, col, x, y, w, h| match ctx {
             table::TableContext::StartPage => draw::set_font(enums::Font::Helvetica, 14),
             table::TableContext::ColHeader => draw_header(&format!("{}", (col + 65) as u8 as char), x, y, w, h), 
