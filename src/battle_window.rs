@@ -16,7 +16,7 @@ pub enum BattleWindowEvents{
 pub struct BattleWindow{
     pub group: group::Group,
     player_field: Table,
-    opponent_field: Table,
+    pub opponent_field: Table,
 }
 
 impl BattleWindow{
@@ -96,6 +96,8 @@ impl BattleWindow{
 
         group.add(&player_table);
         group.add(&opponent_table);
+
+        
         BattleWindow { group: group, player_field: player_table, opponent_field: opponent_table }
     }
 }

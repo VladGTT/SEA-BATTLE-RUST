@@ -11,45 +11,41 @@ pub struct Message{
 }
 
 pub struct Connection{
-    stream:Option<TcpStream>,
+    stream:TcpStream,
 }
-impl Default for Connection{
-    fn default() -> Self {
-        Connection { stream: None}
+impl Clone for Connection{
+    fn clone(&self) -> Self {
+        Connection { stream: self.stream.try_clone().unwrap() }
     }
 }
 
+
 impl Connection{
-    pub fn connect_as_server(&mut self, socket: &str)->Result<(),()>{
+    pub fn connect_as_server(socket: &str)->Result<Self,()>{
         match TcpListener::bind(socket).unwrap().accept(){
             Ok((stream,_)) =>{
-                self.stream=Some(stream);
+                
                 // Self::listen(self.stream.as_ref().unwrap(), sender);
-                Ok(())
+                Ok(Connection { stream: stream})
             },
             Err(_) => Err(())
         }    
 
     }
-    pub fn connect_as_client(&mut self, socket: &str)->Result<(),()>{
+    pub fn connect_as_client(socket: &str)->Result<Self,()>{
         match TcpStream::connect(socket){
             Ok(stream) =>{
-                self.stream=Some(stream);
                 // Self::listen(self.stream.as_ref().unwrap(),sender);
-                Ok(())
+                Ok(Connection { stream: stream})
+
             },
             Err(_) => Err(())
         }    
     }
     pub fn write(&self,data: Message)->Result<(),()>{
-        match self.stream.as_ref(){
-            Some(str)=>{
-                match str.try_clone().unwrap().write(&data.data){
-                    Ok(_)=>Ok(()),
-                    Err(_)=>Err(())
-                }
-            },
-            None=>Err(())
+        match self.stream.try_clone().unwrap().write(&data.data){
+            Ok(_)=>Ok(()),
+            Err(_)=>Err(())
         }
     }
     
@@ -69,7 +65,7 @@ impl Connection{
     //     None
     // }
     pub async fn listen_for(&self,mes :&Message)->Result<(),()>{
-        let mut stream=self.stream.as_ref().unwrap().try_clone().unwrap();
+        let mut stream=self.stream.try_clone().unwrap();
         let mut buf = [0 as u8;2];
         loop{
             std::thread::sleep(std::time::Duration::from_millis(100));
@@ -88,7 +84,7 @@ impl Connection{
         }
     }
     pub async fn listen(&self)->Option<Message>{
-        let mut stream=self.stream.as_ref().unwrap().try_clone().unwrap();
+        let mut stream=self.stream.try_clone().unwrap();
         let mut buf = [0 as u8;2];
         loop{
             std::thread::sleep(std::time::Duration::from_millis(100));
