@@ -49,21 +49,6 @@ impl Connection{
         }
     }
     
-    // async fn listen(str: &TcpStream)->Option<Message>{
-    //     let mut stream=str.try_clone().unwrap();
-    //     let mut buf = [0 as u8;2];
-    //     loop{
-    //         std::thread::sleep(std::time::Duration::from_millis(100));
-    //         match stream.read(&mut buf){
-    //             Ok(_)=>{
-    //                     // println!("Heard {:?}",buf);
-    //                     return Some(Message { data: buf });
-    //             },
-    //             Err(_)=>()  
-    //         }
-    //     }
-    //     None
-    // }
     pub async fn listen_for(&self,mes :&Message)->Result<(),()>{
         let mut stream=self.stream.try_clone().unwrap();
         let mut buf = [0 as u8;2];

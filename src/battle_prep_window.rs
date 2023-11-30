@@ -1,7 +1,7 @@
 use fltk::{
     enums::{ Color, Event, Font},
     prelude::{WidgetExt, *},
-    *, app::Sender, table::Table, frame::Frame, button::Button,
+    *, app::Sender, table::Table, frame::Frame, button::Button, group::Group,
 };
 
 use crate::play_field::{Field, PlayField};
@@ -19,13 +19,28 @@ pub enum BattlePreparationEvents{
 }
 
 pub struct BattlePrepWindow{
-    pub group: group::Group,
+    pub group: Group,
+
+    label_4deck:Frame,
+    label_3deck:Frame,
+    label_2deck:Frame,
+    label_1deck:Frame,
+
+    reset_btn: Button,
+    ready_btn: Button,
+
     table: Table,
 }
 
 
 impl BattlePrepWindow{
-    
+    pub fn hide(&mut self){
+        self.group.hide();
+    }
+    pub fn show(&mut self){
+        self.group.show();
+
+    }
     pub fn draw(&mut self,data: &PlayField){      
         
         let table = &mut self.table;
@@ -34,6 +49,11 @@ impl BattlePrepWindow{
         let mut label_3deck = Frame::from_dyn_widget(&self.group.child(2).unwrap()).unwrap();
         let mut label_2deck = Frame::from_dyn_widget(&self.group.child(3).unwrap()).unwrap();
         let mut label_1deck = Frame::from_dyn_widget(&self.group.child(4).unwrap()).unwrap();
+
+        // let mut label_4deck = &mut self.label_4deck;
+        // let mut label_3deck = &mut self.label_3deck;
+        // let mut label_2deck = &mut self.label_2deck;
+        // let mut label_1deck = &mut self.label_1deck;
 
         let cloned_data=data.clone();
         table.draw_cell(move |t, ctx, row, col, x, y, w, h| match ctx {
@@ -79,11 +99,11 @@ impl BattlePrepWindow{
         });
 
 
-        let mut reset_btn = Button::from_dyn_widget(&self.group.child(5).unwrap()).unwrap();
+        let mut reset_btn = &mut self.reset_btn;
         reset_btn.set_callback(move|_|sender.send(BattlePreparationEvents::Reset));
 
 
-        let mut ready_btn = Button::from_dyn_widget(&self.group.child(6).unwrap()).unwrap();
+        let mut ready_btn = &mut self.ready_btn;
         ready_btn.set_callback( move|_|sender.send(BattlePreparationEvents::Ready));
     }
 
@@ -99,7 +119,6 @@ impl BattlePrepWindow{
             .with_size(100, 50)
             .with_label("Reset");
     
-       
     
         let mut ready_btn = button::Button::default()
             .with_pos(630, y_pos+250)
@@ -156,19 +175,25 @@ impl BattlePrepWindow{
         table.set_col_header_height(25);
         table.end();
     
-        
-    
         group.add(&table);
         group.add(&label_4deck);
         group.add(&label_3deck);
         group.add(&label_2deck);
         group.add(&label_1deck);
-        group.add(&reset_btn);
         group.add(&ready_btn);
+        group.add(&reset_btn);
+    
 
-        group.end();
-
-        BattlePrepWindow {group: group,table: table}
+        BattlePrepWindow {
+            group: group,
+            table: table,
+            label_4deck: label_4deck,
+            label_3deck: label_3deck,
+            label_2deck: label_2deck,
+            label_1deck: label_1deck,
+            ready_btn: ready_btn,
+            reset_btn: reset_btn,
+        }
     }
 
 }

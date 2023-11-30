@@ -9,6 +9,14 @@ pub enum PlayerFieldCell {
     Ship = 1
 }
 
+#[derive(PartialEq, Eq)]
+pub enum StrikeResponce {
+    Hit,
+    Miss,
+    Kill,
+    KilledLast
+}
+
 
 
 
@@ -37,13 +45,6 @@ pub trait GameField {
 pub trait PrepField {
     fn check_surroundings_and_intersection(&self, selection: (i32, i32, i32, i32)) -> bool;
     fn place_ship(&mut self, selection: (i32, i32, i32, i32)) -> Result<(), ()>;
-}
-
-#[derive(PartialEq, Eq)]
-pub enum StrikeResponce {
-    Hit,
-    Miss,
-    Kill((i32,i32,i32,i32)),
 }
 
 pub struct PlayField {
@@ -223,10 +224,23 @@ impl PrepField for PlayField {
 impl GameField for PlayField {
     fn strike_coords(&mut self, position: (u8, u8)) -> StrikeResponce {
         match self.field[position.0 as usize][position.1 as usize]{
-            PlayerFieldCell::Missed => StrikeResponce::Miss,
+            PlayerFieldCell::Missed => {
+                self.mark_as_miss(position);
+                StrikeResponce::Miss
+            },
             PlayerFieldCell::Ship => match self.check_if_killed(position) {
-                Some(coords) => StrikeResponce::Kill(coords),
-                None => StrikeResponce::Hit,
+                Some(coords) => {
+                    self.mark_as_kill(coords);
+                    
+                    if self.get_ship_numb() == (0,0,0,0){
+                        return StrikeResponce::KilledLast
+                    }
+                    StrikeResponce::Kill
+                },
+                None => {
+                    self.mark_as_hit(position);
+                    StrikeResponce::Hit
+                },
             },
             _ => StrikeResponce::Miss,
         }

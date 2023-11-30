@@ -20,6 +20,14 @@ pub struct BattleWindow{
 }
 
 impl BattleWindow{
+    pub fn show(&mut self){
+        self.group.show();
+    }
+
+    pub fn hide(&mut self){
+        self.group.hide();
+    }
+
     pub fn draw(&mut self,player_field: &PlayField,opponent_field: &PlayField){
         let player_table = &mut self.player_field;
         let opponent_table = &mut self.opponent_field;
@@ -64,7 +72,6 @@ impl BattleWindow{
 
         let mut player_table = table::Table::default().with_size(427, 427);
 
-
         player_table.set_rows(10);
         player_table.set_row_header(true);
         player_table.set_row_resize(true);
@@ -74,11 +81,7 @@ impl BattleWindow{
         player_table.set_row_height_all(40);
         player_table.set_row_header_width(25);
         player_table.set_col_header_height(25);
-        player_table.end();
-    
-        
-
-        group.add(&player_table);
+        player_table.end();    
 
         let mut opponent_table = table::Table::default().with_size(427, 427);
 
