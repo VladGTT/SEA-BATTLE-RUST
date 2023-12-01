@@ -1,12 +1,13 @@
 use fltk::{
     enums::{ Color, Event, Font},
     prelude::{WidgetExt, *},
-    *, app::Sender, table::Table, frame::Frame, button::Button, group::Group,
+    *, table::Table, frame::Frame, button::Button, group::Group,
 };
 
 use crate::play_field::{Field, PlayField};
 use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 use crate::draw_table::{draw_data,draw_header};
+use std::sync::mpsc::{Sender};
 
 const COLOR:Color=Color::DarkRed;
 const DEFAULT_COLOR:Color=Color::Black;
@@ -100,11 +101,13 @@ impl BattlePrepWindow{
 
 
         let mut reset_btn = &mut self.reset_btn;
-        reset_btn.set_callback(move|_|sender.send(BattlePreparationEvents::Reset));
+        let reset_sender=sender.clone();
+        reset_btn.set_callback(move|_|reset_sender.send(BattlePreparationEvents::Reset).unwrap());
 
 
         let mut ready_btn = &mut self.ready_btn;
-        ready_btn.set_callback( move|_|sender.send(BattlePreparationEvents::Ready));
+        let ready_sender=sender.clone();
+        ready_btn.set_callback( move|_|ready_sender.send(BattlePreparationEvents::Ready).unwrap());
     }
 
     pub fn new()->Self{
@@ -183,6 +186,8 @@ impl BattlePrepWindow{
         group.add(&ready_btn);
         group.add(&reset_btn);
     
+        group.end();
+
 
         BattlePrepWindow {
             group: group,

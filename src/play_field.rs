@@ -47,6 +47,7 @@ pub trait PrepField {
     fn place_ship(&mut self, selection: (i32, i32, i32, i32)) -> Result<(), ()>;
 }
 
+#[derive(Copy)]
 pub struct PlayField {
     pub field: [[PlayerFieldCell; 10]; 10],
     numb_4deck: i32,

@@ -1,12 +1,13 @@
 use fltk::{
     enums::{ Color, Event, Font},
     prelude::{WidgetExt, *},
-    *, app::Sender, table::Table, frame::Frame,
+    *, table::Table, frame::Frame,
 };
 
 use crate::{draw_table::{draw_data,draw_header}, play_field};
 use crate::play_field::PlayField;
 use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
+use std::sync::mpsc::Sender;
 
 #[derive(Copy,Clone)]
 pub enum BattleWindowEvents{

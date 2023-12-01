@@ -2,7 +2,6 @@ use std::future::Future;
 use std::net::{TcpStream,TcpListener};
 use std::io::{Read, Write};
 // use fltk::app::Sender;
-use std::sync::mpsc::Sender;
 
 
 #[derive(Copy,Clone)]
