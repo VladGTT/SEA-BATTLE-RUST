@@ -5,6 +5,9 @@ mod connection;
 mod draw_table;
 mod play_field;
 mod stats;
+mod connection_window;
+
+use connection_window::{ConnectionOptions,ConnectionWindow};
 
 use fltk::{
     app::{self, Receiver as AppReciever, Sender as AppSender},
@@ -28,7 +31,6 @@ const MAX_3DECK: i32 = 2;
 const MAX_2DECK: i32 = 3;
 const MAX_1DECK: i32 = 4;
 
-const SOCKET: &str = "localhost:8888";
 
 enum GUIEvents {
     RedrawBattleWindow(PlayField, PlayField),
@@ -46,6 +48,9 @@ enum GUIEvents {
 
     HideResultsWindow,
     ShowResultsWindow,
+
+    ShowConnectionWindow,
+    HideConnectionWindow,
 }
 
 fn prepare_field(s: AppSender<GUIEvents>, r: &Receiver<BattlePreparationEvents>) -> PlayField {
@@ -102,20 +107,58 @@ fn show_battle_results(r: &Receiver<BattleResultsEvents>) {
 
 // mut res: BattleResultWindow,
 async fn handle_game(
-    bat_num: usize,
-    is_server: bool,
     sender: AppSender<GUIEvents>,
     prep_reciever: Receiver<BattlePreparationEvents>,
     bat_reciever: Receiver<BattleWindowEvents>,
     res_reciever: Receiver<BattleResultsEvents>,
-    conn: Connection,
+    conn_window: Receiver<ConnectionOptions>
 ) {
-    let mut my_move = !is_server;
+
+    
+    let mut my_move = false;
+    
+    let conn: Connection;
+    let mut bat_num=1;
+    sender.send(GUIEvents::ShowConnectionWindow);
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        if let Ok(msg) = conn_window.recv(){
+            match msg{
+                ConnectionOptions::ConnectAsServer(numb)=>{
+                    bat_num=numb;
+                    conn=Connection::connect_as_server().unwrap();
+                    conn.write(Message { data: [0,bat_num]});                    
+                    break;
+                }
+                ConnectionOptions::ConnectAsClient(addr)=>{                 
+                    my_move=true;
+                    conn=Connection::connect_as_client(&format!("{}:8888",addr.to_string())).unwrap();                    
+                    let dat= conn.listen().await.unwrap().data;
+                    match dat{
+                        [0,_]=>{
+                            bat_num=dat[1];
+                        }
+                        _=>()    
+                    };
+                    break;
+
+                }
+            }
+        }
+    }
+    sender.send(GUIEvents::HideConnectionWindow);
+
+    
+
+
+
+
+
+
+
     for _ in 0..bat_num {
         my_move = !my_move;
         
-        // Prepare player field
-        // res.hide();
         
         sender.send(GUIEvents::ShowPreparationsWindow);
         let result = conn.listen_for(&Message { data: [0, 0] });
@@ -270,6 +313,12 @@ async fn main() {
         Receiver<BattleResultsEvents>,
     ) = std::sync::mpsc::channel();
     
+    let (connection_window_sender, connection_window_reciever): (
+        Sender<ConnectionOptions>,
+        Receiver<ConnectionOptions>,
+    ) = std::sync::mpsc::channel();
+    
+
     
     
     
@@ -280,14 +329,18 @@ async fn main() {
     
     let mut battle_prep_window = BattlePrepWindow::new();
     battle_prep_window.set_handler(battle_prep_sender);
-    
+    battle_prep_window.hide();    
     wind.add(&battle_prep_window.group);
 
     let mut battle_results_window = BattleResultWindow::new();
     battle_results_window.set_handler(result_window_sender);
     battle_results_window.hide();
-
     wind.add(&battle_results_window.group);
+
+    let mut connection_window = ConnectionWindow::new();
+    connection_window.set_handler(connection_window_sender);
+    connection_window.hide();
+    wind.add(&connection_window.flex);
 
 
     wind.make_resizable(true);
@@ -299,52 +352,19 @@ async fn main() {
         }
     });
 
-    let mut mode = String::new();
-
-    let stdin = std::io::stdin();
     
-    println!("Write mode");
-    
-    stdin.read_line(&mut mode).unwrap();
     
 
     
-    let mode_str = mode.trim_end();
     
-    let mut battle_num= String::new();
-    
-    let mut connection: Option<Connection> = None;
-    if mode_str == "server" {
-        connection.insert(Connection::connect_as_server(SOCKET).unwrap());
-        wind.set_label("SEA-BATTLE-SERVER");
-
-
-        println!("Write battle number");
-        stdin.read_line(&mut battle_num).unwrap();
-        connection.as_ref().unwrap().write(Message { data: [0,battle_num.trim_end().parse::<u8>().unwrap()]});
-
-    } else {
-        connection.insert(Connection::connect_as_client(SOCKET).unwrap());
-        wind.set_label("SEA-BATTLE-CLIENT");
-
-        let dat= connection.as_ref().unwrap().listen().await.unwrap().data;
-        match dat{
-            [0,_]=>{
-                battle_num.push_str(&format!("{}",dat[1]))
-            }
-            _=>()    
-        };
-    };
 
 
     let handle = tokio::spawn(handle_game(
-        battle_num.trim_end().parse::<usize>().unwrap(),
-        mode_str == "server",
         sender,
         battle_prep_reciever,
         battle_window_reciever,
         result_window_reciever,
-        connection.unwrap().clone(),
+        connection_window_reciever
     ));
     wind.show();
    
@@ -391,6 +411,18 @@ async fn main() {
                 GUIEvents::RedrawResultsWindow(table) => {
                     battle_results_window.draw(&table)
                 }
+
+                GUIEvents::ShowConnectionWindow=>{
+                    connection_window.show();
+                    wind.redraw();
+                }
+
+                GUIEvents::HideConnectionWindow=>{
+                    connection_window.hide();
+                    wind.redraw();
+
+                }
+
             }
         }
     }

@@ -1,8 +1,8 @@
-use std::future::Future;
 use std::net::{TcpStream,TcpListener};
 use std::io::{Read, Write};
 // use fltk::app::Sender;
 
+const SOCKET: &str = "127.0.0.1:8888";
 
 #[derive(Copy,Clone)]
 pub struct Message{
@@ -20,8 +20,8 @@ impl Clone for Connection{
 
 
 impl Connection{
-    pub fn connect_as_server(socket: &str)->Result<Self,()>{
-        match TcpListener::bind(socket).unwrap().accept(){
+    pub fn connect_as_server()->Result<Self,()>{
+        match TcpListener::bind(SOCKET).unwrap().accept(){
             Ok((stream,_)) =>{
                 
                 // Self::listen(self.stream.as_ref().unwrap(), sender);
