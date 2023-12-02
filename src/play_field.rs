@@ -1,4 +1,4 @@
-use crate::{MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK};
+use crate::game::{MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK};
 
 #[derive(Clone,Copy,PartialEq)]
 pub enum PlayerFieldCell {

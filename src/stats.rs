@@ -16,6 +16,7 @@ pub struct BattleStatistics{
 }
 
 impl BattleStatistics{
+
     pub fn to_table(&self)->Vec<Vec<String>>{
         let mut retval: Vec<Vec<String>> = Vec::default();
         let header = vec![

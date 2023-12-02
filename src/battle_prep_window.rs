@@ -5,7 +5,7 @@ use fltk::{
 };
 
 use crate::play_field::{Field, PlayField};
-use crate::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
+use crate::game::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 use crate::draw_table::{draw_data,draw_header};
 use std::sync::mpsc::{Sender};
 
