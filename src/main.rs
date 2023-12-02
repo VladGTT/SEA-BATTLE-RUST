@@ -31,7 +31,6 @@ const MAX_3DECK: i32 = 2;
 const MAX_2DECK: i32 = 3;
 const MAX_1DECK: i32 = 4;
 
-
 enum GUIEvents {
     RedrawBattleWindow(PlayField, PlayField),
     RedrawPreparationsWindow(PlayField),
@@ -51,6 +50,9 @@ enum GUIEvents {
 
     ShowConnectionWindow,
     HideConnectionWindow,
+
+    MarkWindowAsServer,
+    MarkWindowAsClient,
 }
 
 fn prepare_field(s: AppSender<GUIEvents>, r: &Receiver<BattlePreparationEvents>) -> PlayField {
@@ -104,6 +106,14 @@ fn show_battle_results(r: &Receiver<BattleResultsEvents>) {
         }
     }
 }
+fn listen_connection_window_input(rec: &Receiver<ConnectionOptions>)->ConnectionOptions{
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        if let Ok(msg) = rec.recv(){
+            return msg;
+        }
+    }
+}
 
 // mut res: BattleResultWindow,
 async fn handle_game(
@@ -120,40 +130,35 @@ async fn handle_game(
     let conn: Connection;
     let mut bat_num=1;
     sender.send(GUIEvents::ShowConnectionWindow);
-    loop {
-        std::thread::sleep(std::time::Duration::from_millis(5));
-        if let Ok(msg) = conn_window.recv(){
-            match msg{
-                ConnectionOptions::ConnectAsServer(numb)=>{
-                    bat_num=numb;
-                    conn=Connection::connect_as_server().unwrap();
-                    conn.write(Message { data: [0,bat_num]});                    
-                    break;
-                }
-                ConnectionOptions::ConnectAsClient(addr)=>{                 
-                    my_move=true;
-                    conn=Connection::connect_as_client(&format!("{}:8888",addr.to_string())).unwrap();                    
-                    let dat= conn.listen().await.unwrap().data;
-                    match dat{
-                        [0,_]=>{
-                            bat_num=dat[1];
-                        }
-                        _=>()    
-                    };
-                    break;
+    match listen_connection_window_input(&conn_window){
+        ConnectionOptions::ConnectAsServer(numb)=>{
+            sender.send(GUIEvents::HideConnectionWindow);
+            
+            bat_num=numb;
 
+            conn=Connection::connect_as_server().unwrap();
+            conn.write(Message { data: [0,bat_num]});                    
+        
+            sender.send(GUIEvents::MarkWindowAsServer);
+        }
+        ConnectionOptions::ConnectAsClient(addr)=>{                 
+            sender.send(GUIEvents::HideConnectionWindow);
+
+            my_move=true;
+
+            conn=Connection::connect_as_client(&format!("{}:8888",addr.to_string())).unwrap();                    
+            let dat= conn.listen().await.unwrap().data;
+            match dat{
+                [0,_]=>{
+                    bat_num=dat[1];
                 }
-            }
+                _=>()    
+            };
+
+            sender.send(GUIEvents::MarkWindowAsClient);
+
         }
     }
-    sender.send(GUIEvents::HideConnectionWindow);
-
-    
-
-
-
-
-
 
 
     for _ in 0..bat_num {
@@ -345,13 +350,6 @@ async fn main() {
 
     wind.make_resizable(true);
 
-    wind.set_callback(move |_| {
-        if app::event() == enums::Event::Close {
-            app.quit();
-            return;
-        }
-    });
-
     
     
 
@@ -368,6 +366,13 @@ async fn main() {
     ));
     wind.show();
    
+    wind.set_callback(move |_| {
+        if app::event() == enums::Event::Close {
+            app.quit();
+            
+        }
+    });
+
 
     while app.wait() {
         if let Some(msg) = reciever.recv() {
@@ -423,6 +428,14 @@ async fn main() {
 
                 }
 
+                GUIEvents::MarkWindowAsClient=>{
+                    wind.set_label("SEA-BATTLE-CLIENT");
+                }
+
+                
+                GUIEvents::MarkWindowAsServer=>{
+                    wind.set_label("SEA-BATTLE-SERVER");
+                }
             }
         }
     }
