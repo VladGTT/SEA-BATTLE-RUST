@@ -1,10 +1,9 @@
 use fltk::{
-    enums::{ Color, Event, Font},
     prelude::{WidgetExt, *},
-    *, table::Table, frame::Frame, button::Button, group::Group,
+    *, table::Table, button::Button, group::Group,
 };
 use crate::stats::BattleStatistics;
-use std::sync::mpsc::{Sender};
+use std::sync::mpsc::Sender;
 
 
 pub enum BattleResultsEvents{
@@ -34,7 +33,7 @@ impl BattleResultWindow{
         let mut group=group::Group::new(0,0,800,600,None);
 
 
-        let mut btn = button::Button::default()
+        let btn = button::Button::default()
             .with_pos(700, 0)
             .with_size(100, 50)
             .with_label("Ok");
@@ -68,7 +67,7 @@ impl BattleResultWindow{
 
         let data=stats.to_table();
 
-        self.table.draw_cell(move |t,cont,row,col,x,y,width,height|{
+        self.table.draw_cell(move |_,cont,row,col,x,y,width,height|{
             match cont{
                 table::TableContext::StartPage=>{draw::set_font(enums::Font::Helvetica, 14)},
                 table::TableContext::ColHeader=>{

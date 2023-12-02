@@ -179,7 +179,6 @@ pub fn render_gui(
                 GUIEvents::MarkWindowAsClient=>{
                     wind.set_label("SEA-BATTLE-CLIENT");
                 }
-
                 
                 GUIEvents::MarkWindowAsServer=>{
                     wind.set_label("SEA-BATTLE-SERVER");

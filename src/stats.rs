@@ -33,7 +33,7 @@ impl BattleStatistics{
 
         let player_results = vec![
             {if let BattleResults::PlayerWon=self.results.as_ref().unwrap(){"You"}else{""}}.to_string(),
-            (if self.player_shots_fired!=0 {self.player_shots_hit/self.player_shots_fired}else{1}).to_string(),
+            (if self.player_shots_fired!=0 {format!("{:.2}",self.player_shots_hit as f64/self.player_shots_fired as f64)}else{1.0.to_string()}),
             self.opponent_ships_destroed.3.to_string(),
             self.opponent_ships_destroed.2.to_string(),
             self.opponent_ships_destroed.1.to_string(),
@@ -44,7 +44,8 @@ impl BattleStatistics{
 
         let opponent_results = vec![
             {if let BattleResults::PlayerLost=self.results.as_ref().unwrap(){"Opponent"}else{""}}.to_string(),
-            (if self.opponent_shots_fired!=0 {self.opponent_shots_hit/self.opponent_shots_fired}else{1}).to_string(),
+            (if self.opponent_shots_fired!=0 {format!("{:.2}",self.opponent_shots_hit as f64/self.opponent_shots_fired as f64)}else{1.0.to_string()}),
+
             self.player_ships_destroed.3.to_string(),
             self.player_ships_destroed.2.to_string(),
             self.player_ships_destroed.1.to_string(),

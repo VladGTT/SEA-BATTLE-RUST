@@ -7,7 +7,7 @@ use fltk::{
 use crate::play_field::{Field, PlayField};
 use crate::game::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 use crate::draw_table::{draw_data,draw_header};
-use std::sync::mpsc::{Sender};
+use std::sync::mpsc::Sender;
 
 const COLOR:Color=Color::DarkRed;
 const DEFAULT_COLOR:Color=Color::Black;
@@ -21,11 +21,6 @@ pub enum BattlePreparationEvents{
 
 pub struct BattlePrepWindow{
     pub group: Group,
-
-    label_4deck:Frame,
-    label_3deck:Frame,
-    label_2deck:Frame,
-    label_1deck:Frame,
 
     reset_btn: Button,
     ready_btn: Button,
@@ -50,11 +45,6 @@ impl BattlePrepWindow{
         let mut label_3deck = Frame::from_dyn_widget(&self.group.child(2).unwrap()).unwrap();
         let mut label_2deck = Frame::from_dyn_widget(&self.group.child(3).unwrap()).unwrap();
         let mut label_1deck = Frame::from_dyn_widget(&self.group.child(4).unwrap()).unwrap();
-
-        // let mut label_4deck = &mut self.label_4deck;
-        // let mut label_3deck = &mut self.label_3deck;
-        // let mut label_2deck = &mut self.label_2deck;
-        // let mut label_1deck = &mut self.label_1deck;
 
         let cloned_data=data.clone();
         table.draw_cell(move |t, ctx, row, col, x, y, w, h| match ctx {
@@ -100,12 +90,12 @@ impl BattlePrepWindow{
         });
 
 
-        let mut reset_btn = &mut self.reset_btn;
+        let reset_btn = &mut self.reset_btn;
         let reset_sender=sender.clone();
         reset_btn.set_callback(move|_|reset_sender.send(BattlePreparationEvents::Reset).unwrap());
 
 
-        let mut ready_btn = &mut self.ready_btn;
+        let ready_btn = &mut self.ready_btn;
         let ready_sender=sender.clone();
         ready_btn.set_callback( move|_|ready_sender.send(BattlePreparationEvents::Ready).unwrap());
     }
@@ -117,13 +107,13 @@ impl BattlePrepWindow{
         let y_pos=50;
     
     
-        let mut reset_btn = button::Button::default()
+        let reset_btn = button::Button::default()
             .with_pos(480, y_pos+250)
             .with_size(100, 50)
             .with_label("Reset");
     
     
-        let mut ready_btn = button::Button::default()
+        let ready_btn = button::Button::default()
             .with_pos(630, y_pos+250)
             .with_size(100, 50)
             .with_label("Ready");
@@ -192,10 +182,6 @@ impl BattlePrepWindow{
         BattlePrepWindow {
             group: group,
             table: table,
-            label_4deck: label_4deck,
-            label_3deck: label_3deck,
-            label_2deck: label_2deck,
-            label_1deck: label_1deck,
             ready_btn: ready_btn,
             reset_btn: reset_btn,
         }

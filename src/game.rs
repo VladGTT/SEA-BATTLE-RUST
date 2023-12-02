@@ -79,6 +79,16 @@ fn listen_connection_window_input(rec: &Receiver<ConnectionOptions>) -> Connecti
     }
 }
 
+
+
+
+
+
+
+
+
+
+
 pub fn handle_game(
     sender: AppSender<GUIEvents>,
     prep_reciever: Receiver<BattlePreparationEvents>,
