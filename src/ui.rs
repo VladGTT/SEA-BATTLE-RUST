@@ -1,12 +1,13 @@
 
 use crate::play_field::PlayField;
-use crate::stats::BattleStatistics;
+use crate::stats::{BattleStatistics,PlayersRating};
 
+use fltk::dialog;
 use fltk::{
     app::{self, Receiver as AppReciever, Sender as AppSender},
     enums,
     prelude::*,
-    window,
+    window
 };
 use std::{sync::mpsc::{Receiver, Sender}, thread::JoinHandle};
 
@@ -18,7 +19,7 @@ use crate::connection_window::{ConnectionOptions,ConnectionWindow};
 pub enum GUIEvents {
     RedrawBattleWindow(PlayField, PlayField),
     RedrawPreparationsWindow(PlayField),
-    RedrawResultsWindow(BattleStatistics),
+    RedrawResultsWindow(BattleStatistics,BattleStatistics,PlayersRating),
 
     DisableBattleWindow,
     EnableBattleWindow,
@@ -38,6 +39,7 @@ pub enum GUIEvents {
     MarkWindowAsServer,
     MarkWindowAsClient,
 
+    ShowGameResults(i32,i32),
     Quit
 }
 
@@ -164,8 +166,8 @@ pub fn render_gui(
                     battle_prep_window.draw(&field);
                 }
 
-                GUIEvents::RedrawResultsWindow(table) => {
-                    battle_results_window.draw(&table)
+                GUIEvents::RedrawResultsWindow(table1,table2,rating) => {
+                    battle_results_window.draw((&table1,&table2),&rating)
                 }
 
                 GUIEvents::ShowConnectionWindow=>{
@@ -182,6 +184,22 @@ pub fn render_gui(
                 
                 GUIEvents::MarkWindowAsServer=>{
                     wind.set_label("SEA-BATTLE-SERVER");
+                }
+
+                GUIEvents::ShowGameResults(player_res,opponent_res)=>{
+                    let mut txt = String::default();
+                    if player_res==opponent_res{
+                        txt = format!("Stalemate with results {}:{}",player_res,opponent_res);
+                    }
+                    
+                    if player_res>opponent_res{
+                        txt = format!("Winner {} with results {}:{}","You",player_res,opponent_res);
+                    } else {
+                        txt = format!("Winner {} with results {}:{}","Opponent",opponent_res,player_res);
+                    }
+                    
+                    let _ = dialog::message_default(&txt);
+                    app.quit();
                 }
 
                 GUIEvents::Quit=>{

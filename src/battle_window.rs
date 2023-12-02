@@ -1,12 +1,11 @@
 use fltk::{
-    enums::{ Color, Event, Font},
+    enums::Event,
     prelude::{WidgetExt, *},
-    *, table::Table, frame::Frame,
+    *, table::Table
 };
 
-use crate::{draw_table::{draw_data,draw_header}, play_field};
+use crate::draw_table::{draw_data,draw_header};
 use crate::play_field::PlayField;
-use crate::game::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 use std::sync::mpsc::Sender;
 
 #[derive(Copy,Clone)]
@@ -60,7 +59,7 @@ impl BattleWindow{
         self.opponent_field.handle(move|obj, event| match event{
             Event::Released => {
                 let coords = obj.get_selection();
-                sender.send(BattleWindowEvents::Strike((coords.0,coords.1)));
+                sender.send(BattleWindowEvents::Strike((coords.0,coords.1))).unwrap();
                 true
             }
             _ => false,

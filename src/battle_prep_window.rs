@@ -83,7 +83,7 @@ impl BattlePrepWindow{
 
         self.table.handle(move|obj, event| match event{
             Event::Released => {
-                table_sender.send(BattlePreparationEvents::ShipPlaced(obj.get_selection()));
+                table_sender.send(BattlePreparationEvents::ShipPlaced(obj.get_selection())).unwrap();
                 true
             }
             _ => false,

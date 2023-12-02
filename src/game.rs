@@ -1,5 +1,5 @@
 use crate::play_field::{Field, GameField, PlayField, PrepField, StrikeResponce};
-use crate::stats::{BattleResults, BattleStatistics};
+use crate::stats::{BattleStatistics,PlayersRating};
 
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
@@ -97,6 +97,7 @@ pub fn handle_game(
     conn_window: Receiver<ConnectionOptions>,
 )->JoinHandle<()> {
     std::thread::spawn(move || {
+
         let mut my_move = false;
 
         let conn: Connection;
@@ -133,6 +134,8 @@ pub fn handle_game(
             }
         }
 
+        let mut rating= PlayersRating { n_wins_player: 0, n_wins_opponent: 0 };
+
         for _ in 0..bat_num {
             my_move = !my_move;
 
@@ -145,15 +148,7 @@ pub fn handle_game(
 
             conn.write(Message { data: [0, 0] });
 
-            match result.join().unwrap() {
-                Ok(_) => {
-                    println!("Opponent_is_ready")
-                }
-                Err(_) => {
-                    println!("Opponent_is_not_ready");
-                    return;
-                }
-            }
+            result.join().unwrap();
 
             // Play battle
             let mut opponent_field = PlayField::new_opponent_field();
@@ -162,22 +157,21 @@ pub fn handle_game(
 
             sender.send(GUIEvents::ShowBattleWindow);
 
-            let mut stats = BattleStatistics {
+            let mut player_stats = BattleStatistics {
                 player_shots_hit: 0,
                 player_shots_fired: 0,
-                opponent_shots_hit: 0,
-                opponent_shots_fired: 0,
                 player_ships_destroed: (MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK),
-                opponent_ships_destroed: (MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK),
-                results: None,
+                player_won: None,
+            };
+
+            let mut opponent_stats = BattleStatistics {
+                player_shots_hit: 0,
+                player_shots_fired: 0,
+                player_ships_destroed: (MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK),
+                player_won: None,
             };
             loop {
-                if stats.results.is_some() {
-                    if let BattleResults::PlayerWon = stats.results.as_ref().unwrap() {
-                        println!("You won");
-                    } else {
-                        println!("You lost");
-                    }
+                if player_stats.player_won.is_some() || opponent_stats.player_won.is_some() {
                     break;
                 }
                 if my_move {
@@ -189,11 +183,11 @@ pub fn handle_game(
                         data: [coords.0 as u8, coords.1 as u8],
                     });
 
-                    stats.player_shots_fired += 1;
+                    player_stats.player_shots_fired += 1;
 
                     match conn.listen().join().unwrap() {
                         None => {
-                            println!("Connection_broken");
+                            // println!("Connection_broken");
                         }
                         Some(data) => match data.data {
                             [255, 255] => {
@@ -202,11 +196,11 @@ pub fn handle_game(
                                         .check_if_killed((coords.0 as u8, coords.1 as u8))
                                         .unwrap(),
                                 );
-                                stats.player_shots_hit += 1;
+                                player_stats.player_shots_hit += 1;
                             }
                             [254, 254] => {
                                 opponent_field.mark_as_hit((coords.0 as u8, coords.1 as u8));
-                                stats.player_shots_hit += 1;
+                                player_stats.player_shots_hit += 1;
                             }
                             [253, 253] => {
                                 opponent_field.mark_as_miss((coords.0 as u8, coords.1 as u8));
@@ -218,9 +212,12 @@ pub fn handle_game(
                                         .check_if_killed((coords.0 as u8, coords.1 as u8))
                                         .unwrap(),
                                 );
-                                stats.player_shots_hit += 1;
+                                player_stats.player_shots_hit += 1;
 
-                                stats.results = Some(BattleResults::PlayerWon);
+                                player_stats.player_won = Some(true);
+                                opponent_stats.player_won=Some(false);
+
+                                rating.n_wins_player+=1;
                             }
                             _ => (),
                         },
@@ -230,20 +227,20 @@ pub fn handle_game(
                 } else {
                     sender.send(GUIEvents::DisableBattleWindow);
 
-                    stats.opponent_shots_fired += 1;
+                    opponent_stats.player_shots_fired += 1;
                     match conn.listen().join().unwrap() {
                         None => {
-                            println!("Connection_broken");
+                            // println!("Connection_broken");
                         }
                         Some(data) => {
                             match player_field.strike_coords((data.data[0], data.data[1])) {
                                 StrikeResponce::Hit => {
                                     conn.write(Message { data: [254, 254] });
-                                    stats.opponent_shots_hit += 1;
+                                    opponent_stats.player_shots_hit += 1;
                                 }
                                 StrikeResponce::Kill => {
                                     conn.write(Message { data: [255, 255] });
-                                    stats.opponent_shots_hit += 1;
+                                    opponent_stats.player_shots_hit += 1;
                                 }
                                 StrikeResponce::Miss => {
                                     conn.write(Message { data: [253, 253] });
@@ -251,8 +248,11 @@ pub fn handle_game(
                                 }
                                 StrikeResponce::KilledLast => {
                                     conn.write(Message { data: [252, 252] });
-                                    stats.opponent_shots_hit += 1;
-                                    stats.results = Some(BattleResults::PlayerLost);
+                                    opponent_stats.player_shots_hit += 1;
+                                    opponent_stats.player_won = Some(true);
+                                    player_stats.player_won=Some(false);
+
+                                    rating.n_wins_opponent+=1;
                                 }
                             }
                         }
@@ -263,22 +263,15 @@ pub fn handle_game(
             }
             sender.send(GUIEvents::HideBattleWindow);
 
-            {
-                stats.opponent_ships_destroed.0 -= opponent_field.get_ship_numb().0;
-                stats.opponent_ships_destroed.1 -= opponent_field.get_ship_numb().1;
-                stats.opponent_ships_destroed.2 -= opponent_field.get_ship_numb().2;
-                stats.opponent_ships_destroed.3 -= opponent_field.get_ship_numb().3;
+                
+            player_stats.calc_ships_destroed(player_field.get_ship_numb());
+            opponent_stats.calc_ships_destroed(opponent_field.get_ship_numb());
 
-                stats.player_ships_destroed.0 -= player_field.get_ship_numb().0;
-                stats.player_ships_destroed.1 -= player_field.get_ship_numb().1;
-                stats.player_ships_destroed.2 -= player_field.get_ship_numb().2;
-                stats.player_ships_destroed.3 -= player_field.get_ship_numb().3;
-            }
-
-            sender.send(GUIEvents::RedrawResultsWindow(stats));
+            sender.send(GUIEvents::RedrawResultsWindow(player_stats,opponent_stats,rating));
             sender.send(GUIEvents::ShowResultsWindow);
             show_battle_results(&res_reciever);
             sender.send(GUIEvents::HideResultsWindow);
         }
+        sender.send(GUIEvents::ShowGameResults(rating.n_wins_player,rating.n_wins_opponent));
     })
 }
