@@ -1,6 +1,7 @@
 use std::net::{TcpStream,TcpListener};
 use std::io::{Read, Write};
 // use fltk::app::Sender;
+use std::thread::JoinHandle;
 
 const SOCKET: &str = "127.0.0.1:8888";
 
@@ -48,38 +49,79 @@ impl Connection{
         }
     }
     
-    pub async fn listen_for(&self,mes :&Message)->Result<(),()>{
+    // pub async fn listen_for(&self,mes :&Message)->Result<(),()>{
+    //     let mut stream=self.stream.try_clone().unwrap();
+    //     let mut buf = [0 as u8;2];
+    //     loop{
+    //         std::thread::sleep(std::time::Duration::from_millis(100));
+    //         match stream.read(&mut buf){
+    //             Ok(_)=>{
+    //                 // println!("Heard {:?}",buf);
+    //                 if mes.data == buf {
+    //                     return Ok(())
+    //                 }
+    //                 else{
+    //                     return Err(())
+    //                 }
+    //             },
+    //             Err(_)=>()  
+    //         }
+    //     }
+    // }
+    pub fn listen_for(&self,mes: Message)->JoinHandle<Result<(),()>>{
         let mut stream=self.stream.try_clone().unwrap();
-        let mut buf = [0 as u8;2];
-        loop{
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            match stream.read(&mut buf){
-                Ok(_)=>{
-                    // println!("Heard {:?}",buf);
-                    if mes.data == buf {
-                        return Ok(())
-                    }
-                    else{
-                        return Err(())
-                    }
-                },
-                Err(_)=>()  
+        std::thread::spawn(move||{
+            let mut buf = [0 as u8;2];
+            loop{
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                match stream.read(&mut buf){
+                    Ok(_)=>{
+                        // println!("Heard {:?}",buf);
+                        if mes.data == buf {
+                            return Ok(())
+                        }
+                        else{
+                            return Err(())
+                        }
+                    },
+                    Err(_)=>()  
+                }
             }
-        }
+        })
     }
-    pub async fn listen(&self)->Option<Message>{
+
+
+    // pub async fn listen(&self)->Option<Message>{
+    //     let mut stream=self.stream.try_clone().unwrap();
+    //     let mut buf = [0 as u8;2];
+    //     loop{
+    //         std::thread::sleep(std::time::Duration::from_millis(100));
+    //         match stream.read(&mut buf){
+    //             Ok(_)=>{
+    //                 // println!("Heard {:?}",buf);
+    //                 return Some(Message { data: buf })
+    //             },
+    //             Err(_)=>return None  
+    //         }
+    //     }
+    // }
+    
+    pub fn listen(&self)->JoinHandle<Option<Message>>{
         let mut stream=self.stream.try_clone().unwrap();
-        let mut buf = [0 as u8;2];
-        loop{
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            match stream.read(&mut buf){
-                Ok(_)=>{
-                    // println!("Heard {:?}",buf);
-                    return Some(Message { data: buf })
-                },
-                Err(_)=>return None  
+        
+        std::thread::spawn(move||{
+            let mut buf = [0 as u8;2];
+            loop{
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                match stream.read(&mut buf){
+                    Ok(_)=>{
+                        // println!("Heard {:?}",buf);
+                        return Some(Message { data: buf })
+                    },
+                    Err(_)=>return None  
+                }
             }
-        }
+        })
     }
 }
 

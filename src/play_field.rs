@@ -225,7 +225,7 @@ impl PrepField for PlayField {
 impl GameField for PlayField {
     fn strike_coords(&mut self, position: (u8, u8)) -> StrikeResponce {
         match self.field[position.0 as usize][position.1 as usize]{
-            PlayerFieldCell::Missed => {
+            PlayerFieldCell::Bachground => {
                 self.mark_as_miss(position);
                 StrikeResponce::Miss
             },

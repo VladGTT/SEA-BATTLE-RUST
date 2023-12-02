@@ -116,7 +116,7 @@ fn listen_connection_window_input(rec: &Receiver<ConnectionOptions>)->Connection
 }
 
 // mut res: BattleResultWindow,
-async fn handle_game(
+fn handle_game(
     sender: AppSender<GUIEvents>,
     prep_reciever: Receiver<BattlePreparationEvents>,
     bat_reciever: Receiver<BattleWindowEvents>,
@@ -146,8 +146,12 @@ async fn handle_game(
 
             my_move=true;
 
-            conn=Connection::connect_as_client(&format!("{}:8888",addr.to_string())).unwrap();                    
-            let dat= conn.listen().await.unwrap().data;
+            conn=Connection::connect_as_client(&format!("{}:8888",addr.to_string())).unwrap();   
+
+            
+
+
+            let dat= conn.listen().join().unwrap().unwrap().data;
             match dat{
                 [0,_]=>{
                     bat_num=dat[1];
@@ -166,7 +170,7 @@ async fn handle_game(
         
         
         sender.send(GUIEvents::ShowPreparationsWindow);
-        let result = conn.listen_for(&Message { data: [0, 0] });
+        let result = conn.listen_for(Message { data: [0, 0] });
         
         let mut player_field = prepare_field(sender.clone(), &prep_reciever);
         
@@ -174,7 +178,7 @@ async fn handle_game(
         
         conn.write(Message { data: [0, 0] });
         
-        match result.await {
+        match result.join().unwrap() {
             Ok(_) => {
                 println!("Opponent_is_ready")
             }
@@ -220,7 +224,7 @@ async fn handle_game(
 
                 stats.player_shots_fired += 1;
 
-                match conn.listen().await {
+                match conn.listen().join().unwrap() {
                     None => {
                         println!("Connection_broken");
                     }
@@ -260,7 +264,7 @@ async fn handle_game(
                 sender.send(GUIEvents::DisableBattleWindow);
 
                 stats.opponent_shots_fired += 1;
-                match conn.listen().await {
+                match conn.listen().join().unwrap() {
                     None => {
                         println!("Connection_broken");
                     }
@@ -298,8 +302,7 @@ async fn handle_game(
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let app = app::App::default().with_scheme(app::Scheme::Gtk);
 
     let mut wind = window::Window::default().with_size(800, 600);
@@ -357,19 +360,20 @@ async fn main() {
     
 
 
-    let handle = tokio::spawn(handle_game(
+    let handle = std::thread::spawn(move ||{
+        handle_game(
         sender,
         battle_prep_reciever,
         battle_window_reciever,
         result_window_reciever,
         connection_window_reciever
-    ));
+        );
+    });
     wind.show();
    
     wind.set_callback(move |_| {
         if app::event() == enums::Event::Close {
             app.quit();
-            
         }
     });
 
@@ -419,12 +423,12 @@ async fn main() {
 
                 GUIEvents::ShowConnectionWindow=>{
                     connection_window.show();
-                    wind.redraw();
+                    // wind.redraw();
                 }
 
                 GUIEvents::HideConnectionWindow=>{
                     connection_window.hide();
-                    wind.redraw();
+                    // wind.redraw();
 
                 }
 
