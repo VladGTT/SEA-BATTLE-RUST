@@ -1,5 +1,5 @@
 use crate::play_field::{Field, GameField, PlayField, PrepField, StrikeResponce};
-use crate::stats::{BattleStatistics,PlayersRating};
+use crate::stats::{BattleStatistics, PlayersRating};
 
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
@@ -79,25 +79,14 @@ fn listen_connection_window_input(rec: &Receiver<ConnectionOptions>) -> Connecti
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 pub fn handle_game(
     sender: AppSender<GUIEvents>,
     prep_reciever: Receiver<BattlePreparationEvents>,
     bat_reciever: Receiver<BattleWindowEvents>,
     res_reciever: Receiver<BattleResultsEvents>,
     conn_window: Receiver<ConnectionOptions>,
-)->JoinHandle<()> {
+) -> JoinHandle<()> {
     std::thread::spawn(move || {
-
         let mut my_move = false;
 
         let conn: Connection;
@@ -109,7 +98,7 @@ pub fn handle_game(
 
                 bat_num = numb;
 
-                conn = Connection::connect_as_server().unwrap();
+                conn = Connection::connect_as_server(sender.clone()).unwrap();
                 conn.write(Message { data: [0, bat_num] });
 
                 sender.send(GUIEvents::MarkWindowAsServer);
@@ -120,9 +109,9 @@ pub fn handle_game(
                 my_move = true;
 
                 conn =
-                    Connection::connect_as_client(&format!("{}:8888", addr.to_string())).unwrap();
+                    Connection::connect_as_client(&format!("{}:8888", addr.to_string()),sender.clone()).unwrap();
 
-                let dat = conn.listen().join().unwrap().unwrap().data;
+                let dat = conn.listen().join().unwrap().data;
                 match dat {
                     [0, _] => {
                         bat_num = dat[1];
@@ -134,13 +123,17 @@ pub fn handle_game(
             }
         }
 
-        let mut rating= PlayersRating { n_wins_player: 0, n_wins_opponent: 0 };
+        let mut rating = PlayersRating {
+            n_wins_player: 0,
+            n_wins_opponent: 0,
+        };
 
         for _ in 0..bat_num {
             my_move = !my_move;
 
             sender.send(GUIEvents::ShowPreparationsWindow);
-            let result = conn.listen_for(Message { data: [0, 0] });
+            // let result = conn.listen_for(Message { data: [0, 0] });
+            let result = conn.listen();
 
             let mut player_field = prepare_field(sender.clone(), &prep_reciever);
 
@@ -185,42 +178,37 @@ pub fn handle_game(
 
                     player_stats.player_shots_fired += 1;
 
-                    match conn.listen().join().unwrap() {
-                        None => {
-                            // println!("Connection_broken");
+                    match conn.listen().join().unwrap().data {
+                        [255, 255] => {
+                            opponent_field.mark_as_kill(
+                                opponent_field
+                                    .check_if_killed((coords.0 as u8, coords.1 as u8))
+                                    .unwrap(),
+                            );
+                            player_stats.player_shots_hit += 1;
                         }
-                        Some(data) => match data.data {
-                            [255, 255] => {
-                                opponent_field.mark_as_kill(
-                                    opponent_field
-                                        .check_if_killed((coords.0 as u8, coords.1 as u8))
-                                        .unwrap(),
-                                );
-                                player_stats.player_shots_hit += 1;
-                            }
-                            [254, 254] => {
-                                opponent_field.mark_as_hit((coords.0 as u8, coords.1 as u8));
-                                player_stats.player_shots_hit += 1;
-                            }
-                            [253, 253] => {
-                                opponent_field.mark_as_miss((coords.0 as u8, coords.1 as u8));
-                                my_move = false;
-                            }
-                            [252, 252] => {
-                                opponent_field.mark_as_kill(
-                                    opponent_field
-                                        .check_if_killed((coords.0 as u8, coords.1 as u8))
-                                        .unwrap(),
-                                );
-                                player_stats.player_shots_hit += 1;
+                        [254, 254] => {
+                            opponent_field.mark_as_hit((coords.0 as u8, coords.1 as u8));
+                            player_stats.player_shots_hit += 1;
+                        }
+                        [253, 253] => {
+                            opponent_field.mark_as_miss((coords.0 as u8, coords.1 as u8));
+                            my_move = false;
+                        }
+                        [252, 252] => {
+                            opponent_field.mark_as_kill(
+                                opponent_field
+                                    .check_if_killed((coords.0 as u8, coords.1 as u8))
+                                    .unwrap(),
+                            );
+                            player_stats.player_shots_hit += 1;
 
-                                player_stats.player_won = Some(true);
-                                opponent_stats.player_won=Some(false);
+                            player_stats.player_won = Some(true);
+                            opponent_stats.player_won = Some(false);
 
-                                rating.n_wins_player+=1;
-                            }
-                            _ => (),
-                        },
+                            rating.n_wins_player += 1;
+                        }
+                        _ => (),
                     }
 
                     sender.send(GUIEvents::EnableBattleWindow);
@@ -228,33 +216,27 @@ pub fn handle_game(
                     sender.send(GUIEvents::DisableBattleWindow);
 
                     opponent_stats.player_shots_fired += 1;
-                    match conn.listen().join().unwrap() {
-                        None => {
-                            // println!("Connection_broken");
+                    let data = conn.listen().join().unwrap();
+                    match player_field.strike_coords((data.data[0], data.data[1])) {
+                        StrikeResponce::Hit => {
+                            conn.write(Message { data: [254, 254] });
+                            opponent_stats.player_shots_hit += 1;
                         }
-                        Some(data) => {
-                            match player_field.strike_coords((data.data[0], data.data[1])) {
-                                StrikeResponce::Hit => {
-                                    conn.write(Message { data: [254, 254] });
-                                    opponent_stats.player_shots_hit += 1;
-                                }
-                                StrikeResponce::Kill => {
-                                    conn.write(Message { data: [255, 255] });
-                                    opponent_stats.player_shots_hit += 1;
-                                }
-                                StrikeResponce::Miss => {
-                                    conn.write(Message { data: [253, 253] });
-                                    my_move = true;
-                                }
-                                StrikeResponce::KilledLast => {
-                                    conn.write(Message { data: [252, 252] });
-                                    opponent_stats.player_shots_hit += 1;
-                                    opponent_stats.player_won = Some(true);
-                                    player_stats.player_won=Some(false);
+                        StrikeResponce::Kill => {
+                            conn.write(Message { data: [255, 255] });
+                            opponent_stats.player_shots_hit += 1;
+                        }
+                        StrikeResponce::Miss => {
+                            conn.write(Message { data: [253, 253] });
+                            my_move = true;
+                        }
+                        StrikeResponce::KilledLast => {
+                            conn.write(Message { data: [252, 252] });
+                            opponent_stats.player_shots_hit += 1;
+                            opponent_stats.player_won = Some(true);
+                            player_stats.player_won = Some(false);
 
-                                    rating.n_wins_opponent+=1;
-                                }
-                            }
+                            rating.n_wins_opponent += 1;
                         }
                     }
                     sender.send(GUIEvents::EnableBattleWindow);
@@ -263,15 +245,21 @@ pub fn handle_game(
             }
             sender.send(GUIEvents::HideBattleWindow);
 
-                
             player_stats.calc_ships_destroed(player_field.get_ship_numb());
             opponent_stats.calc_ships_destroed(opponent_field.get_ship_numb());
 
-            sender.send(GUIEvents::RedrawResultsWindow(player_stats,opponent_stats,rating));
+            sender.send(GUIEvents::RedrawResultsWindow(
+                player_stats,
+                opponent_stats,
+                rating,
+            ));
             sender.send(GUIEvents::ShowResultsWindow);
             show_battle_results(&res_reciever);
             sender.send(GUIEvents::HideResultsWindow);
         }
-        sender.send(GUIEvents::ShowGameResults(rating.n_wins_player,rating.n_wins_opponent));
+        sender.send(GUIEvents::ShowGameResults(
+            rating.n_wins_player,
+            rating.n_wins_opponent,
+        ));
     })
 }

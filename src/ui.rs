@@ -40,6 +40,12 @@ pub enum GUIEvents {
     MarkWindowAsClient,
 
     ShowGameResults(i32,i32),
+
+
+    ConnectionDropped,
+    ConnectionReistablished,
+    ConnectionDisconnected,
+
     Quit
 }
 
@@ -200,6 +206,21 @@ pub fn render_gui(
                     
                     let _ = dialog::message_default(&txt);
                     app.quit();
+                }
+
+                GUIEvents::ConnectionDisconnected=>{
+                    let _ = dialog::message_default("Opponnect disconnected");
+                    app.quit()                    
+                }
+
+                GUIEvents::ConnectionDropped=>{
+                    let _ = dialog::message_default("Connection dropped");
+                    wind.deactivate();
+                }
+                
+                GUIEvents::ConnectionReistablished=>{
+                    let _ = dialog::message_default("Connection reistalished");
+                    wind.activate();
                 }
 
                 GUIEvents::Quit=>{
