@@ -172,11 +172,8 @@ pub fn handle_game(
                                 let mut f = File::create(str).unwrap();
                                 f.write_all(&player_field.to_array());
                             } else {
-                                    
+                                sender.send(GUIEvents::NotAllShipsPlaced);    
                             }
-
-
-
                         }
                         _=>()
                     }
