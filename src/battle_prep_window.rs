@@ -15,6 +15,8 @@ const DEFAULT_COLOR:Color=Color::Black;
 #[derive(Copy,Clone)]
 pub enum BattlePreparationEvents{
     ShipPlaced((i32,i32,i32,i32)),
+    FieldSaved,
+    FieldLoaded,
     Ready,
     Reset
 }
@@ -24,6 +26,9 @@ pub struct BattlePrepWindow{
 
     reset_btn: Button,
     ready_btn: Button,
+
+    save_btn: Button,
+    load_btn: Button,
 
     table: Table,
 }
@@ -98,28 +103,41 @@ impl BattlePrepWindow{
         let ready_btn = &mut self.ready_btn;
         let ready_sender=sender.clone();
         ready_btn.set_callback( move|_|ready_sender.send(BattlePreparationEvents::Ready).unwrap());
+
+
+
+        
+
+        let save_btn = &mut self.save_btn;
+        let save_sender=sender.clone();
+        save_btn.set_callback(move|_|save_sender.send(BattlePreparationEvents::FieldSaved).unwrap());
+
+
+        let load_btn = &mut self.load_btn;
+        let load_sender=sender.clone();
+        load_btn.set_callback( move|_|load_sender.send(BattlePreparationEvents::FieldLoaded).unwrap());
     }
 
     pub fn new()->Self{
         let mut group=group::Group::new(0,0,800,600,None);
     
-    
+        
         let y_pos=50;
     
     
         let reset_btn = button::Button::default()
-            .with_pos(480, y_pos+250)
+            .with_pos(480, y_pos+350)
             .with_size(100, 50)
             .with_label("Reset");
     
     
         let ready_btn = button::Button::default()
-            .with_pos(630, y_pos+250)
+            .with_pos(630, y_pos+350)
             .with_size(100, 50)
             .with_label("Ready");
     
-    
-    
+        
+
         let mut label_4deck = frame::Frame::default()
             .with_pos(600, y_pos)
             .with_label(&format!("Ships with 4 decks remained: {}",MAX_4DECK));
@@ -157,6 +175,20 @@ impl BattlePrepWindow{
 
         let mut table = table::Table::default().with_size(427, 427);
 
+
+        
+        let save_btn = button::Button::default()
+            .with_pos(480, y_pos+250)
+            .with_size(100, 50)
+            .with_label("Save");
+
+
+        let load_btn = button::Button::default()
+            .with_pos(630, y_pos+250)
+            .with_size(100, 50)
+            .with_label("Load");
+
+
         table.set_rows(10);
         table.set_row_header(true);
         table.set_row_resize(true);
@@ -176,7 +208,11 @@ impl BattlePrepWindow{
         group.add(&ready_btn);
         group.add(&reset_btn);
     
+        group.add(&save_btn);
+        group.add(&load_btn);
+    
         group.end();
+
 
 
         BattlePrepWindow {
@@ -184,6 +220,8 @@ impl BattlePrepWindow{
             table: table,
             ready_btn: ready_btn,
             reset_btn: reset_btn,
+            save_btn: save_btn,
+            load_btn: load_btn
         }
     }
 

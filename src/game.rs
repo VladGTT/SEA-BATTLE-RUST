@@ -11,6 +11,9 @@ use crate::ui::GUIEvents;
 
 use fltk::app::Sender as AppSender;
 
+use std::fs::File;
+use std::io::{Read,Write};
+
 
 pub const MAX_4DECK: i32 = 1;
 pub const MAX_3DECK: i32 = 2;
@@ -18,7 +21,7 @@ pub const MAX_2DECK: i32 = 3;
 pub const MAX_1DECK: i32 = 4;
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum GameEvents{
     PlayerSurrendered,
     OpponentSurrendered,
@@ -44,10 +47,8 @@ pub enum GameEvents{
     OpponentStrike((i32,i32)),
     OpponnentReady,
 
-
-    ConnectionDropped,
-    ConnectionReistablished,
-    ConnectionDisconnected,
+    FieldSaved(String),
+    FieldLoaded(String),
 } 
 
 
@@ -153,6 +154,29 @@ pub fn handle_game(
                         }
                         GameEvents::OpponnentReady => {
                             is_opponent_ready=true;
+                        }
+
+                        GameEvents::FieldLoaded(str)=>{
+
+                            let mut f = File::open(str).unwrap();
+                            let mut data = [0 as u8;100];
+                            f.read(&mut data);
+
+                            player_field.from_array(data);
+                            sender.send(GUIEvents::RedrawPreparationsWindow(player_field));
+
+                        }
+                        GameEvents::FieldSaved(str)=>{
+
+                            if player_field.get_ship_numb() == (MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK){
+                                let mut f = File::create(str).unwrap();
+                                f.write_all(&player_field.to_array());
+                            } else {
+                                    
+                            }
+
+
+
                         }
                         _=>()
                     }

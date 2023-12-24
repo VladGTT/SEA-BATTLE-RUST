@@ -17,7 +17,16 @@ pub enum StrikeResponce {
     KilledLast
 }
 
-
+fn to_player_field_cell(arg: u8)->Option<PlayerFieldCell>{
+    match arg{
+        0=>Some(PlayerFieldCell::Bachground),
+        1=>Some(PlayerFieldCell::Ship),
+        2=>Some(PlayerFieldCell::Missed),
+        3=>Some(PlayerFieldCell::Hit),
+        4=>Some(PlayerFieldCell::Killed),
+        _=>None
+    }
+}
 
 
 pub trait Field {
@@ -45,6 +54,8 @@ pub trait GameField {
 pub trait PrepField {
     fn check_surroundings_and_intersection(&self, selection: (i32, i32, i32, i32)) -> bool;
     fn place_ship(&mut self, selection: (i32, i32, i32, i32)) -> Result<(), ()>;
+    fn to_array(&self)->[u8;100];
+    fn from_array(&mut self,arg: [u8;100]);
 }
 
 #[derive(Copy)]
@@ -219,6 +230,28 @@ impl PrepField for PlayField {
         };
 
         Ok(())
+    }
+    fn to_array(&self)->[u8;100] {
+        let mut retval = [0 as u8;100];
+
+        for i in 0..10{
+            for j in 0..10{
+                retval[10*i+j] = self.field[i][j] as u8;
+            }
+        }
+        retval
+    }
+    fn from_array(&mut self,arg: [u8;100]){        
+        for i in 0..10{
+            for j in 0..10{
+                self.field[i][j] = to_player_field_cell(arg[10*i+j]).unwrap();
+            }
+        }
+        self.numb_1deck=MAX_1DECK;
+        self.numb_2deck=MAX_2DECK;
+        self.numb_3deck=MAX_3DECK;
+        self.numb_4deck=MAX_4DECK;
+
     }
 }
 

@@ -53,7 +53,7 @@ pub enum GUIEvents {
     UpdatePlayerShipNumber((i32,i32,i32,i32)),
     UpdateOpponentShipNumber((i32,i32,i32,i32)),
 
-
+    NotAllShipsPlaced,
 
     Quit
 }
@@ -235,6 +235,10 @@ pub fn render_gui(arg:fn(AppSender<GUIEvents>,Sender<GameEvents>,Receiver<GameEv
                     
                 }
 
+                GUIEvents::NotAllShipsPlaced=>{
+                    let _ = dialog::message_default("Can't save scene not all ships are placed");
+                }
+
                 GUIEvents::UpdatePlayerShipNumber(numb)=>{
 
                 }
@@ -263,6 +267,19 @@ pub fn render_gui(arg:fn(AppSender<GUIEvents>,Sender<GameEvents>,Receiver<GameEv
                 }
                 BattlePreparationEvents::ShipPlaced(coords) => {
                     game_events_sender.send(GameEvents::ShipPlaced(coords));
+                }
+
+
+                BattlePreparationEvents::FieldLoaded=>{
+                    let mut dialog = dialog::NativeFileChooser::new(dialog::NativeFileChooserType::BrowseFile);
+                    dialog.show();
+                    game_events_sender.send(GameEvents::FieldLoaded(String::from(dialog.filename().to_str().unwrap())));
+                }
+                BattlePreparationEvents::FieldSaved=>{
+                    let mut dialog = dialog::NativeFileChooser::new(dialog::NativeFileChooserType::BrowseSaveFile);
+                    dialog.show();
+                    game_events_sender.send(GameEvents::FieldSaved(String::from(dialog.filename().to_str().unwrap())));
+
                 }
             }
         }
