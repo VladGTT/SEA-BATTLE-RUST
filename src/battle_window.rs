@@ -11,12 +11,16 @@ use std::sync::mpsc::Sender;
 #[derive(Copy,Clone)]
 pub enum BattleWindowEvents{
     Strike((i32,i32)),
+    PlayerSurrendered
 }
 
 pub struct BattleWindow{
     pub group: group::Group,
     player_field: Table,
+    button: button::Button,
+
     pub opponent_field: Table,
+
 }
 
 impl BattleWindow{
@@ -55,6 +59,16 @@ impl BattleWindow{
 
     }
     pub fn set_handler(&mut self,sender:Sender<BattleWindowEvents>){
+        let s = sender.clone();
+
+        self.button.handle(move|_, event| match event{
+            Event::Released => {
+                s.send(BattleWindowEvents::PlayerSurrendered).unwrap();
+                true
+            }
+            _ => false,
+        });
+
 
         self.opponent_field.handle(move|obj, event| match event{
             Event::Released => {
@@ -68,8 +82,10 @@ impl BattleWindow{
     }
 
     pub fn new()->Self{
-        let mut group=group::Group::new(0,0,800,600,None);
+        let mut group=group::Group::default_fill();
+        // let mut group=group::Flex::new(0,0,800,600,None);
 
+        let mut btn = fltk::button::Button::new(500,500,50,100,"Surrender");
         let mut player_table = table::Table::default().with_size(427, 427);
 
         player_table.set_rows(10);
@@ -100,7 +116,7 @@ impl BattleWindow{
         group.add(&player_table);
         group.add(&opponent_table);
 
-        
-        BattleWindow { group: group, player_field: player_table, opponent_field: opponent_table }
+
+        BattleWindow { group: group, player_field: player_table, opponent_field: opponent_table, button: btn }
     }
 }

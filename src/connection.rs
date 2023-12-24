@@ -1,7 +1,9 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use fltk::app::Sender;
 use std::thread::JoinHandle;
+
+// use std::sync::mpsc::Sender;
+use fltk::app::Sender;
 
 use crate::ui::GUIEvents;
 
@@ -33,27 +35,6 @@ impl Clone for Connection {
     }
 }
 
-// pub fn listen_for(&self,mes: Message)->JoinHandle<Result<(),()>>{
-//     let mut stream=self.stream.try_clone().unwrap();
-//     std::thread::spawn(move||{
-//         let mut buf = [0 as u8;2];
-//         loop{
-//             std::thread::sleep(std::time::Duration::from_millis(100));
-//             match stream.read(&mut buf){
-//                 Ok(_)=>{
-//                     // println!("Heard {:?}",buf);
-//                     if mes.data == buf {
-//                         return Ok(())
-//                     }
-//                     else{
-//                         return Err(())
-//                     }
-//                 },
-//                 Err(_)=>()
-//             }
-//         }
-//     })
-// }
 
 impl Connection {
     pub fn connect_as_server(sender: Sender<GUIEvents>) -> Result<Self, ()> {
@@ -64,7 +45,9 @@ impl Connection {
                 let mut str = stream.try_clone().unwrap();
                 str.write(&[125, 125]).unwrap();
 
-                Connection::keepalive(str, [125, 125], [126, 126],sender);
+                Connection::keepalive(str, [125, 125], [126, 126],sender.clone());
+                Connection::listen(stream.try_clone().unwrap(), sender);
+
                 Ok(Connection { stream: stream })
             }
             Err(_) => Err(()),
@@ -75,9 +58,8 @@ impl Connection {
             Ok(stream) => {
                 stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
 
-                let str = stream.try_clone().unwrap();
-
-                Connection::keepalive(str, [126, 126], [125, 125],sender);
+                Connection::keepalive(stream.try_clone().unwrap(), [126, 126], [125, 125],sender.clone());
+                Connection::listen(stream.try_clone().unwrap(), sender);
                 Ok(Connection { stream: stream })
             }
             Err(_) => Err(()),
@@ -91,24 +73,74 @@ impl Connection {
         }
     }
 
-    pub fn listen(&self) -> JoinHandle<Message> {
-        let mut stream = self.stream.try_clone().unwrap();
-        let mut buf = [0 as u8; 2];
+    // pub fn listen(&self) -> JoinHandle<Message> {
+    //     let mut stream = self.stream.try_clone().unwrap();
+    //     let mut buf = [0 as u8; 2];
 
-        let handle = std::thread::spawn(move || loop {
-            match stream.peek(&mut buf) {
-                Ok(_) => {
-                    if buf == [125, 125] || buf == [126, 126] {
-                        continue;
+    //     let handle = std::thread::spawn(move || loop {
+    //         match stream.peek(&mut buf) {
+    //             Ok(_) => {
+    //                 if buf == [125, 125] || buf == [126, 126] || buf == [127,127] {
+    //                     continue;
+    //                 }
+    //                 stream.read(&mut buf);
+    //                 return Message { data: buf };
+    //             }
+    //             Err(_) => (),
+    //         }
+    //     });
+
+    //     handle
+    // }
+
+
+    fn listen(mut str: TcpStream,sender:Sender<GUIEvents>){
+        std::thread::spawn(move || {
+            let mut buf = [0 as u8; 2];
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(30));
+            
+                if str.peek(&mut buf).is_ok(){
+                    match buf {
+                        [127,127]=>{
+                            sender.send(GUIEvents::OpponentSurrendered);
+                            str.read(&mut buf);
+                        },
+                        [50,numb]=>{
+                            sender.send(GUIEvents::NumbOfBattes(numb as i32));
+                            str.read(&mut buf);
+                        }
+                        [255, 255]=>{
+                            sender.send(GUIEvents::Killed);
+                            str.read(&mut buf);
+                        }
+                        [254, 254]=>{
+                            sender.send(GUIEvents::Hit);
+                            str.read(&mut buf);
+                        }
+                        [253, 253]=>{
+                            sender.send(GUIEvents::Missed);
+                            str.read(&mut buf);
+                        }
+                        [252, 252]=>{
+                            sender.send(GUIEvents::KilledLast);
+                            str.read(&mut buf);
+                        }
+                        [125, 125] =>(),
+                        [126, 126] =>(),
+                        [200,200] => {
+                            sender.send(GUIEvents::OpponnentReady);
+                            str.read(&mut buf);
+                        }
+                        [x,y]=>{
+                            sender.send(GUIEvents::OpponentStrike((x as i32,y as i32)));
+                            str.read(&mut buf);
+                        }
+
                     }
-                    stream.read(&mut buf);
-                    return Message { data: buf };
                 }
-                Err(_) => (),
             }
         });
-
-        handle
     }
 
     fn keepalive(mut str: TcpStream, ping: [u8; 2], pong: [u8; 2],sender:Sender<GUIEvents>) {
@@ -129,7 +161,6 @@ impl Connection {
                         if !is_restore_notification_sent {
                             //send notification
                             sender.send(GUIEvents::ConnectionReistablished);
-                            // println!("Connection reestablished");
                             is_restore_notification_sent = true;
                         }
                         if is_break_notification_sent {
@@ -141,7 +172,6 @@ impl Connection {
                             if !is_break_notification_sent {
                                 //send notification
                                 sender.send(GUIEvents::ConnectionDropped);
-                                // println!("Connection lost");
                                 is_break_notification_sent = true;
                             }
                             if is_restore_notification_sent {
@@ -150,7 +180,6 @@ impl Connection {
                         } else {
                             //send signal
                             sender.send(GUIEvents::ConnectionDisconnected);
-                            // println!("Opponent disconnected");
                             return;
                         }
                     }
