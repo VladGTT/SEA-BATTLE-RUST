@@ -9,8 +9,8 @@ use crate::game::{MAX_1DECK,MAX_2DECK,MAX_3DECK,MAX_4DECK};
 use crate::draw_table::{draw_data,draw_header};
 use std::sync::mpsc::Sender;
 
-const COLOR:Color=Color::DarkRed;
-const DEFAULT_COLOR:Color=Color::Black;
+pub const COLOR:Color=Color::DarkRed;
+pub const DEFAULT_COLOR:Color=Color::Black;
 
 #[derive(Copy,Clone)]
 pub enum BattlePreparationEvents{
