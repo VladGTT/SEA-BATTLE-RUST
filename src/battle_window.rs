@@ -85,7 +85,7 @@ impl BattleWindow{
         let mut group=group::Group::default_fill();
         // let mut group=group::Flex::new(0,0,800,600,None);
 
-        let mut btn = fltk::button::Button::new(500,500,50,100,"Surrender");
+        let btn = fltk::button::Button::new(500,500,100,50,"Surrender");
         let mut player_table = table::Table::default().with_size(427, 427);
 
         player_table.set_rows(10);

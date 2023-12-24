@@ -4,16 +4,12 @@ use crate::stats::{BattleStatistics, PlayersRating};
 use std::sync::mpsc::{Sender,Receiver};
 use std::thread::JoinHandle;
 
-use crate::battle_prep_window::BattlePreparationEvents;
-use crate::battle_results_window::*;
-use crate::battle_window::BattleWindowEvents;
 use crate::connection_window::ConnectionOptions;
 
 use crate::connection::{Connection, Message};
 use crate::ui::GUIEvents;
 
 use fltk::app::Sender as AppSender;
-use std::{net::Ipv4Addr, str::FromStr};
 
 
 pub const MAX_4DECK: i32 = 1;
@@ -46,7 +42,12 @@ pub enum GameEvents{
     NumbOfBattes(i32),
 
     OpponentStrike((i32,i32)),
-    OpponnentReady
+    OpponnentReady,
+
+
+    ConnectionDropped,
+    ConnectionReistablished,
+    ConnectionDisconnected,
 } 
 
 
@@ -58,10 +59,21 @@ pub enum GameEvents{
 
 pub fn handle_game(
     sender: AppSender<GUIEvents>,
+    sndr:Sender<GameEvents>,
     recv: Receiver<GameEvents>,
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
+        
+        
+        
+        
+        
+        
+        
+        
+        
         let mut my_move = false;
+
 
 
         let mut bat_num = 1;
@@ -74,7 +86,7 @@ pub fn handle_game(
                         sender.send(GUIEvents::HideConnectionWindow);
     
                         bat_num = numb;    
-                        let mut c = Connection::connect_as_server(sender.clone()).unwrap();
+                        let mut c = Connection::connect_as_server(sndr.clone(),sender.clone()).unwrap();
                         c.write(Message { data: [50, bat_num] });
 
                         conn=Some(c);
@@ -84,7 +96,7 @@ pub fn handle_game(
                         sender.send(GUIEvents::HideConnectionWindow);
                     
                         my_move = true;
-                        let mut c = Connection::connect_as_client(&format!("{}:8888", addr.to_string()),sender.clone()).unwrap();
+                        let mut c = Connection::connect_as_client(&format!("{}:8888", addr.to_string()),sndr.clone(),sender.clone()).unwrap();
                         if let Ok(msg) = recv.recv(){
                             if let GameEvents::NumbOfBattes(numb) = msg {
                                 bat_num = numb as u8;
@@ -121,7 +133,7 @@ pub fn handle_game(
             let mut is_player_ready=false;
 
             while !is_player_ready || !is_opponent_ready {
-                if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(5)) {
+                if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(1)) {
                     match msg {
                         GameEvents::Ready => {
                             if player_field.get_ship_numb() == (MAX_1DECK, MAX_2DECK, MAX_3DECK, MAX_4DECK){
@@ -191,30 +203,32 @@ pub fn handle_game(
 
                 if my_move {
                     
-                    let coords: (i32,i32);
-                    loop {
-                        if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(10)) {
-                            if let GameEvents::Strike(crds) = msg {
+                    let mut coords: (i32,i32) = (0,0);
+
+                    if let Ok(msg) = recv.recv() {
+                        match msg {
+                            GameEvents::Strike(crds)=>{
                                 coords=crds;
-                                break;
                             }
-                            if let GameEvents::PlayerSurrendered = msg{
+                            GameEvents::PlayerSurrendered=>{
                                 rating.n_wins_opponent += 1;
                                 opponent_stats.player_won = Some(true);
                                 player_stats.player_won = Some(false);
                                 conn.as_ref().unwrap().write(Message { data: [127,127] });
-                                println!("Player surrendered");
+                                sender.send(GUIEvents::PlayerSurrendered);
                                 break 'game;
                             }
-                            if let GameEvents::OpponentSurrendered = msg{
+                            GameEvents::OpponentSurrendered =>{
                                 rating.n_wins_player += 1;
                                 opponent_stats.player_won = Some(false);
                                 player_stats.player_won = Some(true);
-                                println!("Opponent surrendered");
+                                sender.send(GUIEvents::OpponentSurrendered);
                                 break 'game;
-                            } 
+                            }
+                            _=>{} 
                         }
-                    }    
+                        
+                    }
 
 
 
@@ -227,61 +241,59 @@ pub fn handle_game(
                     player_stats.player_shots_fired += 1;
 
                     
-                    loop {
-                        if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(10)) {
-                            if let GameEvents::PlayerSurrendered = msg{
-                                rating.n_wins_opponent += 1;
-                                opponent_stats.player_won = Some(true);
-                                player_stats.player_won = Some(false);
-                                conn.as_ref().unwrap().write(Message { data: [127,127] });
-                                println!("Player surrendered");
-                                break 'game;
-                            }
-                            if let GameEvents::OpponentSurrendered = msg{
-                                rating.n_wins_player += 1;
-                                opponent_stats.player_won = Some(false);
-                                player_stats.player_won = Some(true);
-                                println!("Opponent surrendered");
-                                break 'game;
-                            }
-                            if let GameEvents::Hit = msg{
-                                opponent_field.mark_as_hit((coords.0 as u8, coords.1 as u8));
-                                player_stats.player_shots_hit += 1;
-                                break;
-                            } 
-                            if let GameEvents::Missed  = msg{
-                                opponent_field.mark_as_miss((coords.0 as u8, coords.1 as u8));
-                                my_move = false;
-                                break;
-
-                            } 
-                            if let GameEvents::Killed  = msg{
-                                opponent_field.mark_as_kill(
-                                    opponent_field
-                                        .check_if_killed((coords.0 as u8, coords.1 as u8))
-                                        .unwrap(),
-                                );
-                                player_stats.player_shots_hit += 1;    
-                                break;
-
-                            } 
-                            if let GameEvents::KilledLast  = msg{
-                                opponent_field.mark_as_kill(
-                                    opponent_field
-                                        .check_if_killed((coords.0 as u8, coords.1 as u8))
-                                        .unwrap(),
-                                );
-                                player_stats.player_shots_hit += 1;
+                        if let Ok(msg) = recv.recv() {
+                            match msg {
+                                GameEvents::PlayerSurrendered=>{
+                                    rating.n_wins_opponent += 1;
+                                    opponent_stats.player_won = Some(true);
+                                    player_stats.player_won = Some(false);
+                                    conn.as_ref().unwrap().write(Message { data: [127,127] });
+                                    sender.send(GUIEvents::PlayerSurrendered);
+                                    break 'game;
+                                }
+                                GameEvents::OpponentSurrendered =>{
+                                    rating.n_wins_player += 1;
+                                    opponent_stats.player_won = Some(false);
+                                    player_stats.player_won = Some(true);
+                                    sender.send(GUIEvents::OpponentSurrendered);
+                                    break 'game;
+                                }
+                                GameEvents::Hit =>{
+                                    opponent_field.mark_as_hit((coords.0 as u8, coords.1 as u8));
+                                    player_stats.player_shots_hit += 1;
+                                    
+                                } 
+                                GameEvents::Missed =>{
+                                    opponent_field.mark_as_miss((coords.0 as u8, coords.1 as u8));
+                                    my_move = false;
     
-                                player_stats.player_won = Some(true);
-                                opponent_stats.player_won = Some(false);
+                                } 
+                                GameEvents::Killed =>{
+                                    opponent_field.mark_as_kill(
+                                        opponent_field
+                                            .check_if_killed((coords.0 as u8, coords.1 as u8))
+                                            .unwrap(),
+                                    );
+                                    player_stats.player_shots_hit += 1;    
     
-                                rating.n_wins_player += 1;    
-                                break;
-
-                            } 
+                                } 
+                                GameEvents::KilledLast =>{
+                                    opponent_field.mark_as_kill(
+                                        opponent_field
+                                            .check_if_killed((coords.0 as u8, coords.1 as u8))
+                                            .unwrap(),
+                                    );
+                                    player_stats.player_shots_hit += 1;
+        
+                                    player_stats.player_won = Some(true);
+                                    opponent_stats.player_won = Some(false);
+        
+                                    rating.n_wins_player += 1;    
+                                } 
+                                _=>()
+                            }
                         }
-                    }
+
 
 
                     sender.send(GUIEvents::EnableBattleWindow);
@@ -290,32 +302,32 @@ pub fn handle_game(
 
                     opponent_stats.player_shots_fired += 1;
 
-                    let mut data: (i32,i32);
-                    loop {
-                        if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(10)) {
-                            if let GameEvents::PlayerSurrendered = msg{
-                                rating.n_wins_opponent += 1;
-                                opponent_stats.player_won = Some(true);
-                                player_stats.player_won = Some(false);
-                                conn.as_ref().unwrap().write(Message { data: [127,127] });
-                                println!("Player surrendered");
-                                break 'game;
-                            }
-                            if let GameEvents::OpponentSurrendered = msg{
-                                rating.n_wins_player += 1;
-                                opponent_stats.player_won = Some(false);
-                                player_stats.player_won = Some(true);
-                                println!("Opponent surrendered");
-                                break 'game;
-                            } 
-                            if let GameEvents::OpponentStrike(dat) = msg{
-                                data=dat;
-                                break;
+                    let mut data: (i32,i32) = (0,0);
+                        if let Ok(msg) = recv.recv(){
+                            match msg{
+                                GameEvents::PlayerSurrendered =>{
+                                    rating.n_wins_opponent += 1;
+                                    opponent_stats.player_won = Some(true);
+                                    player_stats.player_won = Some(false);
+                                    conn.as_ref().unwrap().write(Message { data: [127,127] });
+                                    sender.send(GUIEvents::PlayerSurrendered);
+                                    break 'game;
+                                }
+                                GameEvents::OpponentSurrendered =>{
+                                    rating.n_wins_player += 1;
+                                    opponent_stats.player_won = Some(false);
+                                    player_stats.player_won = Some(true);
+                                    sender.send(GUIEvents::OpponentSurrendered);
+                                    break 'game;
+                                } 
+                                GameEvents::OpponentStrike(dat) =>{
+                                    data=dat;
+                                }
+                                _=>()
                             }
                         }
 
 
-                    }
 
 
                     
@@ -368,24 +380,15 @@ pub fn handle_game(
 
 
 
-            
             loop {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                if let Ok(msg) = recv.recv() {
+                if let Ok(msg) = recv.recv_timeout(std::time::Duration::from_millis(1)) {
                     if let GameEvents::ToNextBattle = msg {
-                        break;
+                        break;      
                     }
                 }
             }
                      
-            
-            
-            
-            
-            
-            
-            
-            
+
             
             
             sender.send(GUIEvents::HideResultsWindow);

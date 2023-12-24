@@ -47,7 +47,6 @@ pub enum GUIEvents {
     ConnectionReistablished,
     ConnectionDisconnected,
 
-
     PlayerSurrendered,
     OpponentSurrendered,
 
@@ -56,26 +55,10 @@ pub enum GUIEvents {
 
 
 
-    
-    Hit,
-    Killed,
-    KilledLast,
-    Missed,
-
-    NumbOfBattes(i32),
-
-    OpponentStrike((i32,i32)),
-
-    OpponnentReady,
-
     Quit
 }
-
-pub fn render_gui(
-    arg:
-        fn(AppSender<GUIEvents>,
-            Receiver<GameEvents>)->JoinHandle<()>)
-        {
+const DELAY: std::time::Duration = std::time::Duration::from_micros(100); 
+pub fn render_gui(arg:fn(AppSender<GUIEvents>,Sender<GameEvents>,Receiver<GameEvents>)->JoinHandle<()>){
     let app = app::App::default().with_scheme(app::Scheme::Gtk);
 
     let mut wind = window::Window::default().with_size(800, 600);
@@ -136,18 +119,16 @@ pub fn render_gui(
         
     }
 
-    
     let (game_events_sender, game_events_reciever): (
         Sender<GameEvents>,
         Receiver<GameEvents>,
     ) = std::sync::mpsc::channel();
+   
     
 
 
-    arg(
-        sender.clone(),
-        game_events_reciever
-    );
+    arg(sender.clone(),game_events_sender.clone(),game_events_reciever);
+
     wind.show();
    
     
@@ -250,10 +231,8 @@ pub fn render_gui(
 
                 }
                 GUIEvents::OpponentSurrendered=>{
-                    game_events_sender.send(GameEvents::OpponentSurrendered);
                     let _ = dialog::message_default("Opponent surrenderred, you won this battle");
                     
-                    // app.quit()                    
                 }
 
                 GUIEvents::UpdatePlayerShipNumber(numb)=>{
@@ -268,20 +247,12 @@ pub fn render_gui(
                     app.quit();
                 }
 
-                GUIEvents::Hit=>{game_events_sender.send(GameEvents::Hit);}
-                GUIEvents::Killed=>{game_events_sender.send(GameEvents::Killed);}
-                GUIEvents::Missed=>{game_events_sender.send(GameEvents::Missed);}
-                GUIEvents::OpponnentReady=>{game_events_sender.send(GameEvents::OpponnentReady);}
-                GUIEvents::OpponentStrike(coords)=>{game_events_sender.send(GameEvents::OpponentStrike(coords));}
-                GUIEvents::KilledLast=>{game_events_sender.send(GameEvents::KilledLast);}
-                GUIEvents::NumbOfBattes(n)=>{game_events_sender.send(GameEvents::NumbOfBattes(n));}
-
             }
         }
 
 
 
-        if let Ok(msg) = battle_prep_reciever.recv_timeout(std::time::Duration::from_millis(10)){
+        if let Ok(msg) = battle_prep_reciever.recv_timeout(DELAY){
             match msg {
                 BattlePreparationEvents::Ready => {
                     game_events_sender.send(GameEvents::Ready);
@@ -298,7 +269,7 @@ pub fn render_gui(
 
 
 
-        if let Ok(msg) = battle_window_reciever.recv_timeout(std::time::Duration::from_millis(2)){
+        if let Ok(msg) = battle_window_reciever.recv_timeout(DELAY){
             if let BattleWindowEvents::Strike(coords) = msg {
                 game_events_sender.send(GameEvents::Strike(coords));
             }
@@ -308,16 +279,18 @@ pub fn render_gui(
             }
         }
 
-        if let Ok(msg) = result_window_reciever.recv_timeout(std::time::Duration::from_millis(2)){
+        if let Ok(msg) = result_window_reciever.recv_timeout(DELAY){
             if let BattleResultsEvents::ButtonPressed = msg {
                 game_events_sender.send(GameEvents::ToNextBattle);
             }
         }
 
-        if let Ok(msg) = connection_window_reciever.recv_timeout(std::time::Duration::from_millis(2)){
+        if let Ok(msg) = connection_window_reciever.recv_timeout(DELAY){
             game_events_sender.send(GameEvents::ConnectAs(msg));
         }
 
+
+        
     }
 
 
