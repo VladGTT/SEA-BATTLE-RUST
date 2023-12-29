@@ -25,7 +25,9 @@ impl BattleStatistics{
     pub fn to_table(player_stats:&Self,opponent_stats: &Self,rating: &PlayersRating)->Vec<Vec<String>>{
         let mut retval: Vec<Vec<String>> = Vec::default();
         let header = vec![
-            "Winner".to_string(),
+            "Player".to_string(),
+            "Battles won".to_string(),
+            "Battle Results".to_string(),
             "Accuracy".to_string(),
             "4-decks destroed".to_string(),
             "3-decks destroed".to_string(),
@@ -35,20 +37,27 @@ impl BattleStatistics{
         
         retval.push(header);
 
-        if rating.n_wins_player>rating.n_wins_opponent{
-            retval.push(player_stats.to_vector());
-            retval.push(opponent_stats.to_vector());
-        }else{
-            retval.push(opponent_stats.to_vector());
-            retval.push(player_stats.to_vector());
+        let mut player_row = player_stats.to_vector();
+        player_row.insert(0,rating.n_wins_player.to_string()); 
+        player_row.insert(0,"You".to_string()); 
+            
+        let mut opponents_row = opponent_stats.to_vector();
+        opponents_row.insert(0,rating.n_wins_opponent.to_string()); 
+        opponents_row.insert(0,"Opponnent".to_string());
+        if rating.n_wins_player>rating.n_wins_opponent{        
+            retval.push(player_row);
+            retval.push(opponents_row);
+        } else {
+            retval.push(opponents_row);
+            retval.push(player_row);
         }
 
         retval
     }
 
-    pub fn to_vector(&self)->Vec<String>{
+    fn to_vector(&self)->Vec<String>{
         vec![
-            {if self.player_won.unwrap(){"You"}else{""}}.to_string(),
+            {if self.player_won.unwrap() {"Won"} else {"Lost"}}.to_string(),
             (if self.player_shots_fired!=0 {format!("{:.2}",self.player_shots_hit as f64/self.player_shots_fired as f64)}else{"N/A".to_string()}),
             self.player_ships_destroed.3.to_string(),
             self.player_ships_destroed.2.to_string(),

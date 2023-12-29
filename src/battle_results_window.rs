@@ -38,13 +38,11 @@ impl BattleResultWindow{
             .with_size(100, 50)
             .with_label("Ok");
 
-
-
         let mut table = table::Table::default().with_pos(0, 0).with_size(700, 300);
 
         table.set_rows(2);
         table.set_row_resize(true);
-        table.set_cols(6);
+        table.set_cols(8);
         table.set_col_header(true);
         table.set_col_width_all(110);
         table.set_row_height_all(50);
