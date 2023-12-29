@@ -8,7 +8,7 @@ use fltk::app::Sender as AppSender;
 use crate::game::GameEvents as Events;
 use crate::ui::GUIEvents;
 
-const SOCKET: &str = "127.0.0.1:8888";
+// const SOCKET: &str = "127.0.0.1:8888";
 
 const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
@@ -31,8 +31,8 @@ impl Clone for Connection {
 
 
 impl Connection {
-    pub fn connect_as_server(sender: Sender<Events>,sndr: AppSender<GUIEvents>) -> Result<Self, ()> {
-        match TcpListener::bind(SOCKET).unwrap().accept() {
+    pub fn connect_as_server(socket: &str,sender: Sender<Events>,sndr: AppSender<GUIEvents>) -> Result<Self, ()> {
+        match TcpListener::bind(socket).unwrap().accept() {
             Ok((stream, _)) => {
                 stream.set_read_timeout(Some(READ_TIMEOUT));
 

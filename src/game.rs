@@ -83,11 +83,11 @@ pub fn handle_game(
         if let Ok(msg) = recv.recv(){
             if let GameEvents::ConnectAs(options) = msg{
                 match options{
-                    ConnectionOptions::ConnectAsServer(numb)=>{
+                    ConnectionOptions::ConnectAsServer(addr,numb)=>{
                         sender.send(GUIEvents::HideConnectionWindow);
     
                         bat_num = numb;    
-                        let mut c = Connection::connect_as_server(sndr.clone(),sender.clone()).unwrap();
+                        let mut c = Connection::connect_as_server(&format!("{}:8888", addr.to_string()),sndr.clone(),sender.clone()).unwrap();
                         c.write(Message { data: [50, bat_num] });
 
                         conn=Some(c);

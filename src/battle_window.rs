@@ -27,9 +27,7 @@ pub struct BattleWindow{
     label_2deck: frame::Frame,
     label_1deck: frame::Frame,
 
-
     pub opponent_field: Table,
-
 }
 
 impl BattleWindow{

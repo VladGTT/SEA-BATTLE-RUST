@@ -4,7 +4,7 @@ use std::sync::mpsc::Sender;
 use std::{net::Ipv4Addr, str::FromStr};
 #[derive(Debug,Clone, Copy)]
 pub enum ConnectionOptions{
-    ConnectAsServer(u8),
+    ConnectAsServer(Ipv4Addr,u8),
     ConnectAsClient(Ipv4Addr),
 }
 
@@ -38,8 +38,20 @@ impl ConnectionWindow{
         let server=s.clone();
         self.btn_server.set_callback(move |_|{
             loop{
-                let dialog = dialog::input_default("Input battle number", "1");
-                let str = match dialog{
+                let str_addr = match dialog::input_default("Input server socket", "127.0.0.1"){
+                    Some(str)=>{
+                        str
+                    },
+                    None=>continue
+                };
+
+                let addr=match Ipv4Addr::from_str(&str_addr){
+                    Ok(val)=>val,
+                    Err(_)=>continue
+                };
+
+
+                let str = match dialog::input_default("Input battle number", "1"){
                     Some(str)=>str,
                     None=>continue
                 };
@@ -49,7 +61,7 @@ impl ConnectionWindow{
                     Err(_)=>continue
                 };
 
-                _=server.send(ConnectionOptions::ConnectAsServer(numb));
+                _=server.send(ConnectionOptions::ConnectAsServer(addr,numb));
                 break;
             }
         });
